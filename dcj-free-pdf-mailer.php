@@ -33,6 +33,7 @@ class DCJ_Free_PDF_Mailer {
 	const NONCE_ACTION           = 'dcj_free_pdf_submit';
 	const NONCE_NAME             = 'dcj_free_pdf_nonce';
 	const DUPLICATE_CHECK_EXPIRE = 300; // 5分（秒）
+	const OPTION_PDF_ITEMS       = 'dcj_fpm_pdf_items';
 
 	/**
 	 * PDFIDごとの処理結果メッセージ
@@ -60,14 +61,32 @@ class DCJ_Free_PDF_Mailer {
 	}
 
 	/**
-	 * 無料PDFコンテンツ設定
+	 * 無料PDFコンテンツ設定を取得します。
 	 *
-	 * 第3段階では、まずPHP配列で管理します。
-	 * 第4段階以降で、管理画面から登録・編集できる形に拡張します。
+	 * WordPress option から保存されたPDF設定を取得します。
+	 * option が未設定または無効な場合は、デフォルト設定を返します。
 	 *
 	 * @return array
 	 */
 	private function get_pdf_items() {
+
+		$items = get_option( self::OPTION_PDF_ITEMS );
+
+		// option が存在し、配列であることを確認
+		if ( is_array( $items ) && ! empty( $items ) ) {
+			return $items;
+		}
+
+		// option が未設定または無効な場合、デフォルト設定を返す
+		return self::get_default_pdf_items();
+	}
+
+	/**
+	 * デフォルト無料PDFコンテンツ設定を取得します。
+	 *
+	 * @return array
+	 */
+	public static function get_default_pdf_items() {
 
 		return array(
 
@@ -679,6 +698,10 @@ class DCJ_Free_PDF_Mailer {
 		<div class="wrap">
 			<h1><?php echo esc_html( 'DCJ Free PDF Mailer' ); ?></h1>
 			
+			<div class="notice notice-info inline">
+				<p><?php echo esc_html( '現在のPDF設定は WordPress option に保存されています。第4-2段階では一覧表示のみで、編集機能はまだありません。' ); ?></p>
+			</div>
+			
 			<table class="widefat striped">
 				<thead>
 					<tr>
@@ -730,9 +753,27 @@ class DCJ_Free_PDF_Mailer {
 		</div>
 		<?php
 	}
+
+	/**
+	 * プラグイン有効化時の処理
+	 */
+	public static function activate() {
+
+		$items = get_option( self::OPTION_PDF_ITEMS, array() );
+
+		// option が未設定または無効な場合のみデフォルト設定を保存
+		if ( empty( $items ) || ! is_array( $items ) ) {
+			add_option( self::OPTION_PDF_ITEMS, self::get_default_pdf_items() );
+		}
+	}
 }
 
 /**
  * プラグイン初期化
  */
 new DCJ_Free_PDF_Mailer();
+
+/**
+ * プラグイン有効化フック登録
+ */
+register_activation_hook( __FILE__, array( 'DCJ_Free_PDF_Mailer', 'activate' ) );
