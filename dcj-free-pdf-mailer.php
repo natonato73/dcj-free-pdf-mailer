@@ -2,8 +2,8 @@
 /**
  * Plugin Name: DCJ Free PDF Mailer
  * Plugin URI: https://dreamcoloringjourney.com/
- * Description: Dream Coloring Journey の無料PDF配布フォーム用プラグインです。ショートコードでメール入力フォームを表示し、テストメールを送信します。
- * Version: 0.2.0
+ * Description: Dream Coloring Journey の無料PDF配布フォーム用プラグインです。ショートコードIDごとに無料PDFメールを送信します。
+ * Version: 0.3.0
  * Author: 名富企画
  * Author URI: https://dreamcoloringjourney.com/
  * License: GPL2
@@ -19,26 +19,27 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * DCJ Free PDF Mailer メインクラス
  *
- * 第2段階では、フォーム送信時にテストメールを送信します。
- * 将来的に、PDF別設定・ログ保存・管理画面を追加する想定です。
+ * 第3段階では、ショートコードIDごとに
+ * PDF URL・件名・本文・表示メッセージを切り替えます。
  */
 class DCJ_Free_PDF_Mailer {
 
 	/**
 	 * プラグイン定数
 	 */
-	const VERSION      = '0.2.0';
-	const PLUGIN_SLUG  = 'dcj-free-pdf-mailer';
-	const CSS_PREFIX   = 'dcj-fpm-';
-	const NONCE_ACTION = 'dcj_free_pdf_submit';
-	const NONCE_NAME   = 'dcj_free_pdf_nonce';
+	const VERSION                = '0.3.0';
+	const PLUGIN_SLUG            = 'dcj-free-pdf-mailer';
+	const CSS_PREFIX             = 'dcj-fpm-';
+	const NONCE_ACTION           = 'dcj_free_pdf_submit';
+	const NONCE_NAME             = 'dcj_free_pdf_nonce';
+	const DUPLICATE_CHECK_EXPIRE = 300; // 5分（秒）
 
 	/**
-	 * 処理結果メッセージ
+	 * PDFIDごとの処理結果メッセージ
 	 *
-	 * @var string
+	 * @var array
 	 */
-	private $message = '';
+	private static $messages = array();
 
 	/**
 	 * コンストラクタ
@@ -50,12 +51,87 @@ class DCJ_Free_PDF_Mailer {
 
 		// ショートコード登録
 		add_shortcode( 'dcj_free_pdf', array( $this, 'render_form' ) );
+
+		// CSSと点滅アニメーションを出力
+		add_action( 'wp_head', array( $this, 'output_styles' ) );
+	}
+
+	/**
+	 * 無料PDFコンテンツ設定
+	 *
+	 * 第3段階では、まずPHP配列で管理します。
+	 * 第4段階以降で、管理画面から登録・編集できる形に拡張します。
+	 *
+	 * @return array
+	 */
+	private function get_pdf_items() {
+
+		return array(
+
+			'christmas-preschool-ja' => array(
+				'id'                => 'christmas-preschool-ja',
+				'lang'              => 'ja',
+				'enabled'           => true,
+				'title'             => 'クリスマス塗り絵 無料PDF',
+				'description'       => '幼児向けのクリスマス塗り絵PDFを、メールで無料プレゼントします。',
+				'pdf_url'           => 'https://dreamcoloringjourney.com/wp-content/uploads/sample/christmas-preschool-ja.pdf',
+				'mail_subject'      => '【Dream Coloring Journey】無料PDFダウンロードリンクのご案内',
+				'mail_body'         => "こんにちは。\n\nDream Coloring Journey の無料PDFにお申し込みいただき、ありがとうございます。\n\n以下のリンクからPDFをダウンロードできます。\n\n{{pdf_url}}\n\n塗り絵の時間を楽しんでいただければ嬉しいです。\n\nDream Coloring Journey",
+				'success_message'   => '無料PDFのご案内メールを送信しました。メールボックスをご確認ください。',
+				'duplicate_message' => 'すでにお申し込み済みです。メールボックスをご確認ください。',
+				'disabled_message'  => 'この無料PDFは現在配布を停止しています。',
+			),
+
+			'christmas-preschool-en' => array(
+				'id'                => 'christmas-preschool-en',
+				'lang'              => 'en',
+				'enabled'           => true,
+				'title'             => 'Free Christmas Coloring PDF',
+				'description'       => 'Enter your email address to receive a free Christmas coloring PDF for young children.',
+				'pdf_url'           => 'https://dreamcoloringjourney.com/wp-content/uploads/sample/christmas-preschool-en.pdf',
+				'mail_subject'      => 'Your Free PDF Download Link from Dream Coloring Journey',
+				'mail_body'         => "Hello,\n\nThank you for requesting a free PDF from Dream Coloring Journey.\n\nYou can download your PDF from the link below:\n\n{{pdf_url}}\n\nWe hope you enjoy your coloring time.\n\nDream Coloring Journey",
+				'success_message'   => 'Your free PDF email has been sent. Please check your inbox.',
+				'duplicate_message' => 'You have already requested this PDF. Please check your inbox.',
+				'disabled_message'  => 'This free PDF is currently unavailable.',
+			),
+
+			'new-year-kids-ja' => array(
+				'id'                => 'new-year-kids-ja',
+				'lang'              => 'ja',
+				'enabled'           => true,
+				'title'             => 'お正月塗り絵 無料PDF',
+				'description'       => '子ども向けのお正月塗り絵PDFを、メールで無料プレゼントします。',
+				'pdf_url'           => 'https://dreamcoloringjourney.com/wp-content/uploads/sample/new-year-kids-ja.pdf',
+				'mail_subject'      => '【Dream Coloring Journey】お正月塗り絵PDFのご案内',
+				'mail_body'         => "こんにちは。\n\nDream Coloring Journey のお正月塗り絵PDFにお申し込みいただき、ありがとうございます。\n\n以下のリンクからPDFをダウンロードできます。\n\n{{pdf_url}}\n\n楽しい塗り絵時間をお過ごしください。\n\nDream Coloring Journey",
+				'success_message'   => 'お正月塗り絵PDFのご案内メールを送信しました。メールボックスをご確認ください。',
+				'duplicate_message' => 'すでにお申し込み済みです。メールボックスをご確認ください。',
+				'disabled_message'  => 'この無料PDFは現在配布を停止しています。',
+			),
+
+		);
+	}
+
+	/**
+	 * 指定IDのPDF設定を取得します。
+	 *
+	 * @param string $pdf_id PDF識別ID
+	 * @return array|null
+	 */
+	private function get_pdf_item( $pdf_id ) {
+
+		$items = $this->get_pdf_items();
+
+		if ( isset( $items[ $pdf_id ] ) ) {
+			return $items[ $pdf_id ];
+		}
+
+		return null;
 	}
 
 	/**
 	 * フォーム送信を処理します。
-	 *
-	 * 第2段階では、入力されたメールアドレス宛にテストメールを送信します。
 	 */
 	public function handle_form_submit() {
 
@@ -66,7 +142,6 @@ class DCJ_Free_PDF_Mailer {
 
 		// nonce が存在するか確認
 		if ( empty( $_POST[ self::NONCE_NAME ] ) ) {
-			$this->message = $this->get_error_message( '送信確認に失敗しました。もう一度お試しください。' );
 			return;
 		}
 
@@ -74,7 +149,6 @@ class DCJ_Free_PDF_Mailer {
 
 		// nonce チェック
 		if ( ! wp_verify_nonce( $nonce, self::NONCE_ACTION ) ) {
-			$this->message = $this->get_error_message( '送信確認に失敗しました。ページを再読み込みしてから、もう一度お試しください。' );
 			return;
 		}
 
@@ -85,7 +159,22 @@ class DCJ_Free_PDF_Mailer {
 		}
 
 		if ( empty( $pdf_id ) ) {
-			$this->message = $this->get_error_message( '無料PDFのIDが確認できませんでした。' );
+			self::$messages[ $pdf_id ] = $this->get_error_message( '無料PDFのIDが確認できませんでした。' );
+			return;
+		}
+
+		// PDF設定取得
+		$pdf_item = $this->get_pdf_item( $pdf_id );
+
+		if ( empty( $pdf_item ) ) {
+			self::$messages[ $pdf_id ] = $this->get_error_message( '指定された無料PDFが見つかりませんでした。' );
+			return;
+		}
+
+		// 無効化されている場合
+		if ( empty( $pdf_item['enabled'] ) ) {
+			$disabled_message = ! empty( $pdf_item['disabled_message'] ) ? $pdf_item['disabled_message'] : 'この無料PDFは現在配布を停止しています。';
+			self::$messages[ $pdf_id ] = $this->get_error_message( $disabled_message );
 			return;
 		}
 
@@ -97,18 +186,36 @@ class DCJ_Free_PDF_Mailer {
 
 		// メール形式チェック
 		if ( empty( $email ) || ! is_email( $email ) ) {
-			$this->message = $this->get_error_message( '正しいメールアドレスを入力してください。' );
+			self::$messages[ $pdf_id ] = $this->get_error_message( '正しいメールアドレスを入力してください。' );
 			return;
 		}
 
-		// 第2段階用のテストメール
-		$subject = '【テスト】無料PDFメール送信確認';
+		// 重複送信防止チェック（5分以内）
+		$duplicate_key = md5( $pdf_id . $email );
+		if ( get_transient( 'dcj_fpm_sent_' . $duplicate_key ) ) {
+			$duplicate_message = ! empty( $pdf_item['duplicate_message'] ) ? $pdf_item['duplicate_message'] : 'すでにお申し込み済みです。メールボックスをご確認ください。';
+			self::$messages[ $pdf_id ] = $this->get_error_message( $duplicate_message );
+			return;
+		}
 
-		$body  = "Dream Coloring Journey の無料PDFメール送信テストです。\n\n";
-		$body .= "このメールは、DCJ Free PDF Mailer の第2段階テストとして送信されています。\n\n";
-		$body .= "選択された無料PDF ID：\n";
-		$body .= $pdf_id . "\n\n";
-		$body .= "※今回はテスト送信のため、まだPDFリンクは含めていません。\n";
+		// 件名
+		$subject = ! empty( $pdf_item['mail_subject'] ) ? $pdf_item['mail_subject'] : '無料PDFダウンロードリンクのご案内';
+
+		// 本文
+		$body_template = ! empty( $pdf_item['mail_body'] ) ? $pdf_item['mail_body'] : "{{pdf_url}}";
+		$pdf_url       = ! empty( $pdf_item['pdf_url'] ) ? esc_url_raw( $pdf_item['pdf_url'] ) : '';
+
+		$body = str_replace(
+			array(
+				'{{pdf_url}}',
+				'{{title}}',
+			),
+			array(
+				$pdf_url,
+				$pdf_item['title'],
+			),
+			$body_template
+		);
 
 		$headers = array(
 			'Content-Type: text/plain; charset=UTF-8',
@@ -117,9 +224,13 @@ class DCJ_Free_PDF_Mailer {
 		$sent = wp_mail( $email, $subject, $body, $headers );
 
 		if ( $sent ) {
-			$this->message = $this->get_success_message( 'テストメールを送信しました。Localのメール受信履歴を確認してください。' );
+			// 送信成功後、重複送信防止フラグを5分間保存
+			set_transient( 'dcj_fpm_sent_' . $duplicate_key, 1, self::DUPLICATE_CHECK_EXPIRE );
+
+			$success_message = ! empty( $pdf_item['success_message'] ) ? $pdf_item['success_message'] : '無料PDFのご案内メールを送信しました。';
+			self::$messages[ $pdf_id ] = $this->get_success_message( $success_message );
 		} else {
-			$this->message = $this->get_error_message( 'メール送信に失敗しました。Localのメール設定を確認してください。' );
+			self::$messages[ $pdf_id ] = $this->get_error_message( 'メール送信に失敗しました。Localのメール設定を確認してください。' );
 		}
 	}
 
@@ -150,16 +261,29 @@ class DCJ_Free_PDF_Mailer {
 		// 管理IDとして使うため sanitize_key を使用
 		$pdf_id = sanitize_key( $atts['id'] );
 
-		return $this->get_form_html( $pdf_id );
+		// PDF設定取得
+		$pdf_item = $this->get_pdf_item( $pdf_id );
+
+		if ( empty( $pdf_item ) ) {
+			return $this->get_error_message( '指定された無料PDFが見つかりませんでした。' );
+		}
+
+		if ( empty( $pdf_item['enabled'] ) ) {
+			$disabled_message = ! empty( $pdf_item['disabled_message'] ) ? $pdf_item['disabled_message'] : 'この無料PDFは現在配布を停止しています。';
+			return $this->get_error_message( $disabled_message );
+		}
+
+		return $this->get_form_html( $pdf_id, $pdf_item );
 	}
 
 	/**
 	 * フォームHTMLを生成します。
 	 *
 	 * @param string $pdf_id PDFの識別ID
+	 * @param array  $pdf_item PDF設定
 	 * @return string フォームHTML
 	 */
-	private function get_form_html( $pdf_id ) {
+	private function get_form_html( $pdf_id, $pdf_item ) {
 
 		// nonceフィールドを生成
 		$nonce_field = wp_nonce_field(
@@ -172,13 +296,18 @@ class DCJ_Free_PDF_Mailer {
 		// 1ページに複数フォームを置いてもIDが重複しないようにする
 		$email_input_id = self::CSS_PREFIX . 'email-' . $pdf_id;
 
+		$title       = ! empty( $pdf_item['title'] ) ? $pdf_item['title'] : '無料PDFをメールで受け取る';
+		$description = ! empty( $pdf_item['description'] ) ? $pdf_item['description'] : 'メールアドレスを入力すると、無料PDFのご案内をお送りします。';
+		$lang        = ! empty( $pdf_item['lang'] ) ? $pdf_item['lang'] : 'ja';
+
+		$button_text = 'ja' === $lang ? '送信する' : 'Send';
+		$label_text  = 'ja' === $lang ? 'メールアドレス' : 'Email address';
+		$note_text   = 'ja' === $lang
+			? 'ご入力いただいたメールアドレスは、無料PDFのご案内に使用します。'
+			: 'Your email address will be used to send this free PDF.';
+
 		$html  = '<div class="' . esc_attr( self::CSS_PREFIX . 'form-container' ) . '" data-pdf-id="' . esc_attr( $pdf_id ) . '">';
 		$html .= '<form method="post" action="" class="' . esc_attr( self::CSS_PREFIX . 'form' ) . '">';
-
-		// 処理結果メッセージ
-		if ( ! empty( $this->message ) ) {
-			$html .= $this->message;
-		}
 
 		// nonce
 		$html .= $nonce_field;
@@ -191,18 +320,18 @@ class DCJ_Free_PDF_Mailer {
 
 		// タイトル
 		$html .= '<div class="' . esc_attr( self::CSS_PREFIX . 'title' ) . '">';
-		$html .= esc_html( '無料PDFをメールで受け取る' );
+		$html .= esc_html( $title );
 		$html .= '</div>';
 
 		// 説明文
 		$html .= '<div class="' . esc_attr( self::CSS_PREFIX . 'description' ) . '">';
-		$html .= esc_html( 'メールアドレスを入力すると、無料PDFのご案内をお送りします。' );
+		$html .= esc_html( $description );
 		$html .= '</div>';
 
 		// メールアドレス入力欄
 		$html .= '<div class="' . esc_attr( self::CSS_PREFIX . 'form-group' ) . '">';
 		$html .= '<label for="' . esc_attr( $email_input_id ) . '" class="' . esc_attr( self::CSS_PREFIX . 'label' ) . '">';
-		$html .= esc_html( 'メールアドレス' );
+		$html .= esc_html( $label_text );
 		$html .= '</label>';
 
 		$html .= '<input ';
@@ -218,14 +347,19 @@ class DCJ_Free_PDF_Mailer {
 		// 送信ボタン
 		$html .= '<div class="' . esc_attr( self::CSS_PREFIX . 'form-group' ) . '">';
 		$html .= '<button type="submit" class="' . esc_attr( self::CSS_PREFIX . 'button' ) . '">';
-		$html .= esc_html( '送信する' );
+		$html .= esc_html( $button_text );
 		$html .= '</button>';
 		$html .= '</div>';
 
 		// 補足文
 		$html .= '<div class="' . esc_attr( self::CSS_PREFIX . 'note' ) . '">';
-		$html .= esc_html( 'ご入力いただいたメールアドレスは、無料PDFのご案内に使用します。' );
+		$html .= esc_html( $note_text );
 		$html .= '</div>';
+
+		// 処理結果メッセージ（補足文の下に表示）
+		if ( isset( self::$messages[ $pdf_id ] ) ) {
+			$html .= self::$messages[ $pdf_id ];
+		}
 
 		$html .= '</form>';
 		$html .= '</div>';
@@ -240,7 +374,7 @@ class DCJ_Free_PDF_Mailer {
 	 * @return string HTML
 	 */
 	private function get_success_message( $message ) {
-		return '<div class="' . esc_attr( self::CSS_PREFIX . 'message ' . self::CSS_PREFIX . 'success' ) . '">' . esc_html( $message ) . '</div>';
+		return '<div class="' . esc_attr( self::CSS_PREFIX . 'message ' . self::CSS_PREFIX . 'success ' . self::CSS_PREFIX . 'blink' ) . '">' . esc_html( $message ) . '</div>';
 	}
 
 	/**
@@ -251,6 +385,145 @@ class DCJ_Free_PDF_Mailer {
 	 */
 	private function get_error_message( $message ) {
 		return '<div class="' . esc_attr( self::CSS_PREFIX . 'message ' . self::CSS_PREFIX . 'error' ) . '">' . esc_html( $message ) . '</div>';
+	}
+
+	/**
+	 * CSSと点滅アニメーションを出力します。
+	 */
+	public function output_styles() {
+		?>
+		<style>
+		/* DCJ Free PDF Mailer フォームスタイル */
+		.<?php echo esc_attr( self::CSS_PREFIX ); ?>form-container {
+			margin: 20px 0;
+			padding: 20px;
+			border: 1px solid #ddd;
+			border-radius: 4px;
+			background-color: #f9f9f9;
+		}
+
+		.<?php echo esc_attr( self::CSS_PREFIX ); ?>form {
+			display: flex;
+			flex-direction: column;
+		}
+
+		.<?php echo esc_attr( self::CSS_PREFIX ); ?>title {
+			font-size: 1.2em;
+			font-weight: bold;
+			margin-bottom: 10px;
+		}
+
+		.<?php echo esc_attr( self::CSS_PREFIX ); ?>description {
+			font-size: 0.95em;
+			color: #666;
+			margin-bottom: 15px;
+		}
+
+		.<?php echo esc_attr( self::CSS_PREFIX ); ?>form-group {
+			margin-bottom: 15px;
+		}
+
+		.<?php echo esc_attr( self::CSS_PREFIX ); ?>label {
+			display: block;
+			margin-bottom: 5px;
+			font-weight: 500;
+		}
+
+		.<?php echo esc_attr( self::CSS_PREFIX ); ?>input {
+			width: 100%;
+			padding: 10px;
+			border: 1px solid #ccc;
+			border-radius: 4px;
+			font-size: 1em;
+			box-sizing: border-box;
+		}
+
+		.<?php echo esc_attr( self::CSS_PREFIX ); ?>input:focus {
+			outline: none;
+			border-color: #4CAF50;
+			box-shadow: 0 0 5px rgba(76, 175, 80, 0.3);
+		}
+
+		.<?php echo esc_attr( self::CSS_PREFIX ); ?>button {
+			padding: 10px 20px;
+			background-color: #4CAF50;
+			color: white;
+			border: none;
+			border-radius: 4px;
+			font-size: 1em;
+			cursor: pointer;
+			transition: background-color 0.3s;
+		}
+
+		.<?php echo esc_attr( self::CSS_PREFIX ); ?>button:hover {
+			background-color: #45a049;
+		}
+
+		.<?php echo esc_attr( self::CSS_PREFIX ); ?>note {
+			font-size: 0.85em;
+			color: #999;
+			margin-top: 10px;
+		}
+
+		/* メッセージスタイル */
+		.<?php echo esc_attr( self::CSS_PREFIX ); ?>message {
+			padding: 12px 15px;
+			border-radius: 4px;
+			margin-top: 15px;
+			margin-bottom: 0;
+		}
+
+		.<?php echo esc_attr( self::CSS_PREFIX ); ?>success {
+			background-color: #d4edda;
+			color: #155724;
+			border: 1px solid #c3e6cb;
+		}
+
+		.<?php echo esc_attr( self::CSS_PREFIX ); ?>error {
+			background-color: #f8d7da;
+			color: #721c24;
+			border: 1px solid #f5c6cb;
+		}
+
+		/* 成功メッセージの点滅アニメーション */
+		.<?php echo esc_attr( self::CSS_PREFIX ); ?>blink {
+			animation: dcj-fpm-blink-animation 1.5s infinite;
+		}
+
+		@keyframes dcj-fpm-blink-animation {
+			0% {
+				opacity: 1;
+				background-color: #d4edda;
+				color: #155724;
+			}
+			50% {
+				opacity: 0.7;
+				background-color: #b8d9c8;
+				color: #0d4017;
+			}
+			100% {
+				opacity: 1;
+				background-color: #d4edda;
+				color: #155724;
+			}
+		}
+
+		/* レスポンシブ対応 */
+		@media (max-width: 600px) {
+			.<?php echo esc_attr( self::CSS_PREFIX ); ?>form-container {
+				padding: 15px;
+			}
+
+			.<?php echo esc_attr( self::CSS_PREFIX ); ?>title {
+				font-size: 1.1em;
+			}
+
+			.<?php echo esc_attr( self::CSS_PREFIX ); ?>button {
+				font-size: 0.95em;
+			}
+		}
+		</style>
+		<?php
 	}
 }
 
