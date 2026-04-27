@@ -69,45 +69,135 @@ class DCJ_Free_PDF_Mailer {
 		return array(
 
 			'christmas-preschool-ja' => array(
+				// 基本情報
 				'id'                => 'christmas-preschool-ja',
 				'lang'              => 'ja',
 				'enabled'           => true,
+				'type'              => 'set',
+				'category'          => 'christmas',
+				'audience'          => 'preschool',
+				'sort_order'        => 10,
+
+				// 表示用情報
 				'title'             => 'クリスマス塗り絵 無料PDF',
 				'description'       => '幼児向けのクリスマス塗り絵PDFを、メールで無料プレゼントします。',
+				'audience_label'    => '幼児向け・3〜6歳',
+				'volume_label'      => 'PDF 5枚セット',
+				'thumbnail_url'     => '',
+
+				// 配信設定
 				'pdf_url'           => 'https://dreamcoloringjourney.com/wp-content/uploads/sample/christmas-preschool-ja.pdf',
+				'placement_type'    => 'official_freebie_page',
+				'delivery_method'   => 'email',
+				'migration_status'  => 'converted',
+
+				// メール設定
 				'mail_subject'      => '【Dream Coloring Journey】無料PDFダウンロードリンクのご案内',
 				'mail_body'         => "こんにちは。\n\nDream Coloring Journey の無料PDFにお申し込みいただき、ありがとうございます。\n\n以下のリンクからPDFをダウンロードできます。\n\n{{pdf_url}}\n\n塗り絵の時間を楽しんでいただければ嬉しいです。\n\nDream Coloring Journey",
+
+				// 利用規約
+				'terms_type'        => 'personal_use_only',
+				'terms_text'        => '家庭内での個人利用に限ります。再配布・二次配布・商用利用は禁止です。',
+
+				// メッセージ
 				'success_message'   => '無料PDFのご案内メールを送信しました。メールボックスをご確認ください。',
 				'duplicate_message' => 'すでにお申し込み済みです。メールボックスをご確認ください。',
 				'disabled_message'  => 'この無料PDFは現在配布を停止しています。',
+
+				// その他
+				'source_page_url'   => '',
+				'kdp_asin'          => '',
+				'kdp_title'         => '',
+				'kdp_url'           => '',
+				'admin_note'        => '正式無料DLページ用。幼児向けクリスマス無料PDF。',
 			),
 
 			'christmas-preschool-en' => array(
+				// 基本情報
 				'id'                => 'christmas-preschool-en',
 				'lang'              => 'en',
 				'enabled'           => true,
+				'type'              => 'set',
+				'category'          => 'christmas',
+				'audience'          => 'preschool',
+				'sort_order'        => 20,
+
+				// 表示用情報
 				'title'             => 'Free Christmas Coloring PDF',
 				'description'       => 'Enter your email address to receive a free Christmas coloring PDF for young children.',
+				'audience_label'    => 'Preschool / Ages 3–6',
+				'volume_label'      => '5-page PDF set',
+				'thumbnail_url'     => '',
+
+				// 配信設定
 				'pdf_url'           => 'https://dreamcoloringjourney.com/wp-content/uploads/sample/christmas-preschool-en.pdf',
+				'placement_type'    => 'official_freebie_page',
+				'delivery_method'   => 'email',
+				'migration_status'  => 'converted',
+
+				// メール設定
 				'mail_subject'      => 'Your Free PDF Download Link from Dream Coloring Journey',
 				'mail_body'         => "Hello,\n\nThank you for requesting a free PDF from Dream Coloring Journey.\n\nYou can download your PDF from the link below:\n\n{{pdf_url}}\n\nWe hope you enjoy your coloring time.\n\nDream Coloring Journey",
+
+				// 利用規約
+				'terms_type'        => 'personal_use_only',
+				'terms_text'        => 'For personal and family use only. Redistribution, resale, and commercial use are not allowed.',
+
+				// メッセージ
 				'success_message'   => 'Your free PDF email has been sent. Please check your inbox.',
 				'duplicate_message' => 'You have already requested this PDF. Please check your inbox.',
 				'disabled_message'  => 'This free PDF is currently unavailable.',
+
+				// その他
+				'source_page_url'   => '',
+				'kdp_asin'          => '',
+				'kdp_title'         => '',
+				'kdp_url'           => '',
+				'admin_note'        => 'English version for the official free download page.',
 			),
 
 			'new-year-kids-ja' => array(
+				// 基本情報
 				'id'                => 'new-year-kids-ja',
 				'lang'              => 'ja',
 				'enabled'           => true,
+				'type'              => 'set',
+				'category'          => 'new-year',
+				'audience'          => 'kids',
+				'sort_order'        => 30,
+
+				// 表示用情報
 				'title'             => 'お正月塗り絵 無料PDF',
 				'description'       => '子ども向けのお正月塗り絵PDFを、メールで無料プレゼントします。',
+				'audience_label'    => '子ども向け・小学生向け',
+				'volume_label'      => 'PDF 5枚セット',
+				'thumbnail_url'     => '',
+
+				// 配信設定
 				'pdf_url'           => 'https://dreamcoloringjourney.com/wp-content/uploads/sample/new-year-kids-ja.pdf',
+				'placement_type'    => 'official_freebie_page',
+				'delivery_method'   => 'email',
+				'migration_status'  => 'converted',
+
+				// メール設定
 				'mail_subject'      => '【Dream Coloring Journey】お正月塗り絵PDFのご案内',
 				'mail_body'         => "こんにちは。\n\nDream Coloring Journey のお正月塗り絵PDFにお申し込みいただき、ありがとうございます。\n\n以下のリンクからPDFをダウンロードできます。\n\n{{pdf_url}}\n\n楽しい塗り絵時間をお過ごしください。\n\nDream Coloring Journey",
+
+				// 利用規約
+				'terms_type'        => 'personal_use_only',
+				'terms_text'        => '家庭内での個人利用に限ります。再配布・二次配布・商用利用は禁止です。',
+
+				// メッセージ
 				'success_message'   => 'お正月塗り絵PDFのご案内メールを送信しました。メールボックスをご確認ください。',
 				'duplicate_message' => 'すでにお申し込み済みです。メールボックスをご確認ください。',
 				'disabled_message'  => 'この無料PDFは現在配布を停止しています。',
+
+				// その他
+				'source_page_url'   => '',
+				'kdp_asin'          => '',
+				'kdp_title'         => '',
+				'kdp_url'           => '',
+				'admin_note'        => '正式無料DLページ用。子ども向けお正月無料PDF。',
 			),
 
 		);
@@ -205,17 +295,30 @@ class DCJ_Free_PDF_Mailer {
 		$body_template = ! empty( $pdf_item['mail_body'] ) ? $pdf_item['mail_body'] : "{{pdf_url}}";
 		$pdf_url       = ! empty( $pdf_item['pdf_url'] ) ? esc_url_raw( $pdf_item['pdf_url'] ) : '';
 
-		$body = str_replace(
-			array(
-				'{{pdf_url}}',
-				'{{title}}',
-			),
-			array(
-				$pdf_url,
-				$pdf_item['title'],
-			),
-			$body_template
+		// 置換用タグの準備
+		$search_tags = array(
+			'{{pdf_url}}',
+			'{{title}}',
+			'{{audience_label}}',
+			'{{volume_label}}',
+			'{{terms_text}}',
+			'{{kdp_asin}}',
+			'{{kdp_title}}',
+			'{{kdp_url}}',
 		);
+
+		$replace_values = array(
+			$pdf_url,
+			! empty( $pdf_item['title'] ) ? $pdf_item['title'] : '',
+			! empty( $pdf_item['audience_label'] ) ? $pdf_item['audience_label'] : '',
+			! empty( $pdf_item['volume_label'] ) ? $pdf_item['volume_label'] : '',
+			! empty( $pdf_item['terms_text'] ) ? $pdf_item['terms_text'] : '',
+			! empty( $pdf_item['kdp_asin'] ) ? $pdf_item['kdp_asin'] : '',
+			! empty( $pdf_item['kdp_title'] ) ? $pdf_item['kdp_title'] : '',
+			! empty( $pdf_item['kdp_url'] ) ? esc_url_raw( $pdf_item['kdp_url'] ) : '',
+		);
+
+		$body = str_replace( $search_tags, $replace_values, $body_template );
 
 		$headers = array(
 			'Content-Type: text/plain; charset=UTF-8',
@@ -300,11 +403,20 @@ class DCJ_Free_PDF_Mailer {
 		$description = ! empty( $pdf_item['description'] ) ? $pdf_item['description'] : 'メールアドレスを入力すると、無料PDFのご案内をお送りします。';
 		$lang        = ! empty( $pdf_item['lang'] ) ? $pdf_item['lang'] : 'ja';
 
-		$button_text = 'ja' === $lang ? '送信する' : 'Send';
-		$label_text  = 'ja' === $lang ? 'メールアドレス' : 'Email address';
-		$note_text   = 'ja' === $lang
-			? 'ご入力いただいたメールアドレスは、無料PDFのご案内に使用します。'
-			: 'Your email address will be used to send this free PDF.';
+		// PDF設定から優先的に取得、なければ言語に応じた既定値を使用
+		$button_text = ! empty( $pdf_item['button_text'] ) 
+			? $pdf_item['button_text'] 
+			: ( 'ja' === $lang ? '送信する' : 'Send' );
+		
+		$label_text = ! empty( $pdf_item['label_text'] ) 
+			? $pdf_item['label_text'] 
+			: ( 'ja' === $lang ? 'メールアドレス' : 'Email address' );
+		
+		$note_text = ! empty( $pdf_item['note_text'] ) 
+			? $pdf_item['note_text'] 
+			: ( 'ja' === $lang
+				? 'ご入力いただいたメールアドレスは、無料PDFのご案内に使用します。'
+				: 'Your email address will be used to send this free PDF.' );
 
 		$html  = '<div class="' . esc_attr( self::CSS_PREFIX . 'form-container' ) . '" data-pdf-id="' . esc_attr( $pdf_id ) . '">';
 		$html .= '<form method="post" action="" class="' . esc_attr( self::CSS_PREFIX . 'form' ) . '">';
