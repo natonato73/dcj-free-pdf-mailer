@@ -2,8 +2,8 @@
 /**
  * Plugin Name: DCJ Free PDF Mailer
  * Plugin URI: https://dreamcoloringjourney.com/
- * Description: Dream Coloring Journey の無料PDF配布フォーム用プラグインです。ショートコードでメール入力フォームを表示します。
- * Version: 0.1.0
+ * Description: Dream Coloring Journey の無料PDF配布フォーム用プラグインです。ショートコードでメール入力フォームを表示し、テストメールを送信します。
+ * Version: 0.2.0
  * Author: 名富企画
  * Author URI: https://dreamcoloringjourney.com/
  * License: GPL2
@@ -19,27 +19,108 @@ if ( ! defined( 'ABSPATH' ) ) {
 /**
  * DCJ Free PDF Mailer メインクラス
  *
- * 第1段階では、ショートコードでメール入力フォームを表示するところまで実装します。
- * 将来的に、メール送信・PDF管理・ログ保存・管理画面を追加する想定です。
+ * 第2段階では、フォーム送信時にテストメールを送信します。
+ * 将来的に、PDF別設定・ログ保存・管理画面を追加する想定です。
  */
 class DCJ_Free_PDF_Mailer {
 
 	/**
 	 * プラグイン定数
 	 */
-	const VERSION      = '0.1.0';
+	const VERSION      = '0.2.0';
 	const PLUGIN_SLUG  = 'dcj-free-pdf-mailer';
 	const CSS_PREFIX   = 'dcj-fpm-';
 	const NONCE_ACTION = 'dcj_free_pdf_submit';
 	const NONCE_NAME   = 'dcj_free_pdf_nonce';
 
 	/**
-	 * コンストラクタ
+	 * 処理結果メッセージ
 	 *
-	 * WordPressにショートコードを登録します。
+	 * @var string
+	 */
+	private $message = '';
+
+	/**
+	 * コンストラクタ
 	 */
 	public function __construct() {
+
+		// フォーム送信処理
+		add_action( 'init', array( $this, 'handle_form_submit' ) );
+
+		// ショートコード登録
 		add_shortcode( 'dcj_free_pdf', array( $this, 'render_form' ) );
+	}
+
+	/**
+	 * フォーム送信を処理します。
+	 *
+	 * 第2段階では、入力されたメールアドレス宛にテストメールを送信します。
+	 */
+	public function handle_form_submit() {
+
+		// このプラグインのフォーム送信でなければ何もしない
+		if ( empty( $_POST['dcj_fpm_submit'] ) ) {
+			return;
+		}
+
+		// nonce が存在するか確認
+		if ( empty( $_POST[ self::NONCE_NAME ] ) ) {
+			$this->message = $this->get_error_message( '送信確認に失敗しました。もう一度お試しください。' );
+			return;
+		}
+
+		$nonce = sanitize_text_field( wp_unslash( $_POST[ self::NONCE_NAME ] ) );
+
+		// nonce チェック
+		if ( ! wp_verify_nonce( $nonce, self::NONCE_ACTION ) ) {
+			$this->message = $this->get_error_message( '送信確認に失敗しました。ページを再読み込みしてから、もう一度お試しください。' );
+			return;
+		}
+
+		// PDF ID取得
+		$pdf_id = '';
+		if ( ! empty( $_POST['dcj_pdf_id'] ) ) {
+			$pdf_id = sanitize_key( wp_unslash( $_POST['dcj_pdf_id'] ) );
+		}
+
+		if ( empty( $pdf_id ) ) {
+			$this->message = $this->get_error_message( '無料PDFのIDが確認できませんでした。' );
+			return;
+		}
+
+		// メールアドレス取得
+		$email = '';
+		if ( ! empty( $_POST['dcj_email'] ) ) {
+			$email = sanitize_email( wp_unslash( $_POST['dcj_email'] ) );
+		}
+
+		// メール形式チェック
+		if ( empty( $email ) || ! is_email( $email ) ) {
+			$this->message = $this->get_error_message( '正しいメールアドレスを入力してください。' );
+			return;
+		}
+
+		// 第2段階用のテストメール
+		$subject = '【テスト】無料PDFメール送信確認';
+
+		$body  = "Dream Coloring Journey の無料PDFメール送信テストです。\n\n";
+		$body .= "このメールは、DCJ Free PDF Mailer の第2段階テストとして送信されています。\n\n";
+		$body .= "選択された無料PDF ID：\n";
+		$body .= $pdf_id . "\n\n";
+		$body .= "※今回はテスト送信のため、まだPDFリンクは含めていません。\n";
+
+		$headers = array(
+			'Content-Type: text/plain; charset=UTF-8',
+		);
+
+		$sent = wp_mail( $email, $subject, $body, $headers );
+
+		if ( $sent ) {
+			$this->message = $this->get_success_message( 'テストメールを送信しました。Localのメール受信履歴を確認してください。' );
+		} else {
+			$this->message = $this->get_error_message( 'メール送信に失敗しました。Localのメール設定を確認してください。' );
+		}
 	}
 
 	/**
@@ -94,8 +175,16 @@ class DCJ_Free_PDF_Mailer {
 		$html  = '<div class="' . esc_attr( self::CSS_PREFIX . 'form-container' ) . '" data-pdf-id="' . esc_attr( $pdf_id ) . '">';
 		$html .= '<form method="post" action="" class="' . esc_attr( self::CSS_PREFIX . 'form' ) . '">';
 
+		// 処理結果メッセージ
+		if ( ! empty( $this->message ) ) {
+			$html .= $this->message;
+		}
+
 		// nonce
 		$html .= $nonce_field;
+
+		// このプラグインの送信であることを示す hidden
+		$html .= '<input type="hidden" name="dcj_fpm_submit" value="1" />';
 
 		// PDF識別ID
 		$html .= '<input type="hidden" name="dcj_pdf_id" value="' . esc_attr( $pdf_id ) . '" />';
@@ -145,13 +234,23 @@ class DCJ_Free_PDF_Mailer {
 	}
 
 	/**
+	 * 成功メッセージを生成します。
+	 *
+	 * @param string $message メッセージ
+	 * @return string HTML
+	 */
+	private function get_success_message( $message ) {
+		return '<div class="' . esc_attr( self::CSS_PREFIX . 'message ' . self::CSS_PREFIX . 'success' ) . '">' . esc_html( $message ) . '</div>';
+	}
+
+	/**
 	 * エラーメッセージを生成します。
 	 *
 	 * @param string $message エラーメッセージ
 	 * @return string HTML
 	 */
 	private function get_error_message( $message ) {
-		return '<div class="' . esc_attr( self::CSS_PREFIX . 'error' ) . '">' . esc_html( $message ) . '</div>';
+		return '<div class="' . esc_attr( self::CSS_PREFIX . 'message ' . self::CSS_PREFIX . 'error' ) . '">' . esc_html( $message ) . '</div>';
 	}
 }
 
