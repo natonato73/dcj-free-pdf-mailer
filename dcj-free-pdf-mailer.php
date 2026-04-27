@@ -691,6 +691,23 @@ class DCJ_Free_PDF_Mailer {
 			wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'dcj-free-pdf-mailer' ) );
 		}
 
+		// フォーム送信処理
+		$this->handle_admin_form_submit();
+
+		// メッセージの取得・表示
+		$success_message = get_transient( 'dcj_fpm_admin_success' );
+		$error_message   = get_transient( 'dcj_fpm_admin_error' );
+
+		if ( $success_message ) {
+			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $success_message ) . '</p></div>';
+			delete_transient( 'dcj_fpm_admin_success' );
+		}
+
+		if ( $error_message ) {
+			echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( $error_message ) . '</p></div>';
+			delete_transient( 'dcj_fpm_admin_error' );
+		}
+
 		// PDF設定を取得
 		$pdf_items = $this->get_pdf_items();
 
@@ -699,8 +716,10 @@ class DCJ_Free_PDF_Mailer {
 			<h1><?php echo esc_html( 'DCJ Free PDF Mailer' ); ?></h1>
 			
 			<div class="notice notice-info inline">
-				<p><?php echo esc_html( '現在のPDF設定は WordPress option に保存されています。第4-2段階では一覧表示のみで、編集機能はまだありません。' ); ?></p>
+				<p><?php echo esc_html( '現在のPDF設定は WordPress option に保存されています。第4-3段階では新規追加機能が実装されました。' ); ?></p>
 			</div>
+			
+			<h2><?php echo esc_html( 'PDF設定一覧' ); ?></h2>
 			
 			<table class="widefat striped">
 				<thead>
@@ -750,7 +769,327 @@ class DCJ_Free_PDF_Mailer {
 					?>
 				</tbody>
 			</table>
+
+			<?php $this->render_add_pdf_form(); ?>
 		</div>
+		<?php
+	}
+
+	/**
+	 * 管理画面からのPDF設定追加フォーム送信を処理します。
+	 *
+	 * @return array|false 成功時は保存されたデータ、失敗時は false
+	 */
+	private function handle_admin_form_submit() {
+
+		// 権限チェック
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return false;
+		}
+
+		// フォーム送信でなければスキップ
+		if ( empty( $_POST['dcj_fpm_add_pdf_item_submit'] ) ) {
+			return false;
+		}
+
+		// nonce チェック
+		if ( empty( $_POST['dcj_fpm_add_pdf_item_nonce'] ) ) {
+			return false;
+		}
+
+		$nonce = sanitize_text_field( wp_unslash( $_POST['dcj_fpm_add_pdf_item_nonce'] ) );
+		if ( ! wp_verify_nonce( $nonce, 'dcj_fpm_add_pdf_item' ) ) {
+			return false;
+		}
+
+		// ID取得・バリデーション
+		$pdf_id = '';
+		if ( ! empty( $_POST['dcj_pdf_id'] ) ) {
+			$pdf_id = sanitize_key( wp_unslash( $_POST['dcj_pdf_id'] ) );
+		}
+
+		if ( empty( $pdf_id ) ) {
+			set_transient( 'dcj_fpm_admin_error', 'IDは必須項目です。', 30 );
+			return false;
+		}
+
+		// ID重複チェック
+		$items = get_option( self::OPTION_PDF_ITEMS, array() );
+		if ( isset( $items[ $pdf_id ] ) ) {
+			set_transient( 'dcj_fpm_admin_error', '同じ管理IDが既に存在します。', 30 );
+			return false;
+		}
+
+		// 必須項目の取得・バリデーション
+		$title = ! empty( $_POST['dcj_title'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_title'] ) ) : '';
+		if ( empty( $title ) ) {
+			set_transient( 'dcj_fpm_admin_error', 'タイトルは必須項目です。', 30 );
+			return false;
+		}
+
+		$pdf_url = ! empty( $_POST['dcj_pdf_url'] ) ? sanitize_url( wp_unslash( $_POST['dcj_pdf_url'] ) ) : '';
+		if ( empty( $pdf_url ) ) {
+			set_transient( 'dcj_fpm_admin_error', 'PDF URLは必須項目です。', 30 );
+			return false;
+		}
+		$pdf_url = esc_url_raw( $pdf_url );
+
+		$mail_subject = ! empty( $_POST['dcj_mail_subject'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_mail_subject'] ) ) : '';
+		if ( empty( $mail_subject ) ) {
+			set_transient( 'dcj_fpm_admin_error', 'メール件名は必須項目です。', 30 );
+			return false;
+		}
+
+		$mail_body = ! empty( $_POST['dcj_mail_body'] ) ? wp_unslash( $_POST['dcj_mail_body'] ) : '';
+		if ( empty( $mail_body ) ) {
+			set_transient( 'dcj_fpm_admin_error', 'メール本文は必須項目です。', 30 );
+			return false;
+		}
+		$mail_body = sanitize_textarea_field( $mail_body );
+
+		// 基本項目の取得
+		$lang                = ! empty( $_POST['dcj_lang'] ) ? sanitize_key( wp_unslash( $_POST['dcj_lang'] ) ) : 'ja';
+		$type                = ! empty( $_POST['dcj_type'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_type'] ) ) : 'set';
+		$category            = ! empty( $_POST['dcj_category'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_category'] ) ) : '';
+		$audience            = ! empty( $_POST['dcj_audience'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_audience'] ) ) : '';
+		$audience_label      = ! empty( $_POST['dcj_audience_label'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_audience_label'] ) ) : '';
+		$volume_label        = ! empty( $_POST['dcj_volume_label'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_volume_label'] ) ) : '';
+		$sort_order          = ! empty( $_POST['dcj_sort_order'] ) ? absint( wp_unslash( $_POST['dcj_sort_order'] ) ) : 0;
+		$placement_type      = ! empty( $_POST['dcj_placement_type'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_placement_type'] ) ) : '';
+		$delivery_method     = ! empty( $_POST['dcj_delivery_method'] ) ? sanitize_key( wp_unslash( $_POST['dcj_delivery_method'] ) ) : 'email';
+		$migration_status    = ! empty( $_POST['dcj_migration_status'] ) ? sanitize_key( wp_unslash( $_POST['dcj_migration_status'] ) ) : 'pending';
+		$enabled             = ! empty( $_POST['dcj_enabled'] ) ? true : false;
+
+		// 表示・配布項目
+		$description        = ! empty( $_POST['dcj_description'] ) ? sanitize_textarea_field( wp_unslash( $_POST['dcj_description'] ) ) : '';
+		$thumbnail_url      = ! empty( $_POST['dcj_thumbnail_url'] ) ? esc_url_raw( sanitize_url( wp_unslash( $_POST['dcj_thumbnail_url'] ) ) ) : '';
+		$button_text        = ! empty( $_POST['dcj_button_text'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_button_text'] ) ) : '';
+		$label_text         = ! empty( $_POST['dcj_label_text'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_label_text'] ) ) : '';
+		$note_text          = ! empty( $_POST['dcj_note_text'] ) ? sanitize_textarea_field( wp_unslash( $_POST['dcj_note_text'] ) ) : '';
+
+		// メッセージ
+		$success_message    = ! empty( $_POST['dcj_success_message'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_success_message'] ) ) : '';
+		$duplicate_message  = ! empty( $_POST['dcj_duplicate_message'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_duplicate_message'] ) ) : '';
+		$disabled_message   = ! empty( $_POST['dcj_disabled_message'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_disabled_message'] ) ) : '';
+
+		// 利用条件・管理項目
+		$terms_type        = ! empty( $_POST['dcj_terms_type'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_terms_type'] ) ) : '';
+		$terms_text        = ! empty( $_POST['dcj_terms_text'] ) ? sanitize_textarea_field( wp_unslash( $_POST['dcj_terms_text'] ) ) : '';
+		$source_page_url   = ! empty( $_POST['dcj_source_page_url'] ) ? esc_url_raw( sanitize_url( wp_unslash( $_POST['dcj_source_page_url'] ) ) ) : '';
+		$kdp_asin          = ! empty( $_POST['dcj_kdp_asin'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_kdp_asin'] ) ) : '';
+		$kdp_title         = ! empty( $_POST['dcj_kdp_title'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_kdp_title'] ) ) : '';
+		$kdp_url           = ! empty( $_POST['dcj_kdp_url'] ) ? esc_url_raw( sanitize_url( wp_unslash( $_POST['dcj_kdp_url'] ) ) ) : '';
+		$admin_note        = ! empty( $_POST['dcj_admin_note'] ) ? sanitize_textarea_field( wp_unslash( $_POST['dcj_admin_note'] ) ) : '';
+
+		// 新しいPDF設定を作成
+		$new_pdf_item = array(
+			'id'                => $pdf_id,
+			'lang'              => $lang,
+			'enabled'           => $enabled,
+			'type'              => $type,
+			'category'          => $category,
+			'audience'          => $audience,
+			'audience_label'    => $audience_label,
+			'volume_label'      => $volume_label,
+			'sort_order'        => $sort_order,
+			'placement_type'    => $placement_type,
+			'delivery_method'   => $delivery_method,
+			'migration_status'  => $migration_status,
+			'title'             => $title,
+			'description'       => $description,
+			'thumbnail_url'     => $thumbnail_url,
+			'pdf_url'           => $pdf_url,
+			'mail_subject'      => $mail_subject,
+			'mail_body'         => $mail_body,
+			'button_text'       => $button_text,
+			'label_text'        => $label_text,
+			'note_text'         => $note_text,
+			'success_message'   => $success_message,
+			'duplicate_message' => $duplicate_message,
+			'disabled_message'  => $disabled_message,
+			'terms_type'        => $terms_type,
+			'terms_text'        => $terms_text,
+			'source_page_url'   => $source_page_url,
+			'kdp_asin'          => $kdp_asin,
+			'kdp_title'         => $kdp_title,
+			'kdp_url'           => $kdp_url,
+			'admin_note'        => $admin_note,
+		);
+
+		// option に追加
+		$items[ $pdf_id ] = $new_pdf_item;
+		$result = update_option( self::OPTION_PDF_ITEMS, $items );
+
+		if ( $result ) {
+			set_transient( 'dcj_fpm_admin_success', 'PDF設定を追加しました。', 30 );
+			return $new_pdf_item;
+		} else {
+			set_transient( 'dcj_fpm_admin_error', 'PDF設定の保存に失敗しました。', 30 );
+			return false;
+		}
+	}
+
+	/**
+	 * 新規PDF設定追加フォームを表示します。
+	 */
+	private function render_add_pdf_form() {
+
+		$nonce = wp_create_nonce( 'dcj_fpm_add_pdf_item' );
+
+		?>
+		<h2><?php echo esc_html( '新規PDF設定を追加' ); ?></h2>
+		
+		<form method="post" action="">
+			<table class="form-table">
+				<tr>
+					<th scope="row"><label for="dcj_pdf_id"><?php echo esc_html( '管理ID' ); ?> *</label></th>
+					<td><input type="text" id="dcj_pdf_id" name="dcj_pdf_id" value="" required /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_lang"><?php echo esc_html( '言語' ); ?></label></th>
+					<td>
+						<select id="dcj_lang" name="dcj_lang">
+							<option value="ja"><?php echo esc_html( '日本語' ); ?></option>
+							<option value="en"><?php echo esc_html( '英語' ); ?></option>
+						</select>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_type"><?php echo esc_html( '種類' ); ?></label></th>
+					<td><input type="text" id="dcj_type" name="dcj_type" value="set" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_category"><?php echo esc_html( 'カテゴリ' ); ?></label></th>
+					<td><input type="text" id="dcj_category" name="dcj_category" value="" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_audience"><?php echo esc_html( '対象' ); ?></label></th>
+					<td><input type="text" id="dcj_audience" name="dcj_audience" value="" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_audience_label"><?php echo esc_html( '対象ラベル' ); ?></label></th>
+					<td><input type="text" id="dcj_audience_label" name="dcj_audience_label" value="" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_volume_label"><?php echo esc_html( 'ボリュームラベル' ); ?></label></th>
+					<td><input type="text" id="dcj_volume_label" name="dcj_volume_label" value="" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_sort_order"><?php echo esc_html( 'ソート順序' ); ?></label></th>
+					<td><input type="number" id="dcj_sort_order" name="dcj_sort_order" value="0" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_placement_type"><?php echo esc_html( '配置タイプ' ); ?></label></th>
+					<td><input type="text" id="dcj_placement_type" name="dcj_placement_type" value="" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_delivery_method"><?php echo esc_html( '配布方式' ); ?></label></th>
+					<td>
+						<select id="dcj_delivery_method" name="dcj_delivery_method">
+							<option value="email"><?php echo esc_html( 'メール' ); ?></option>
+							<option value="direct"><?php echo esc_html( 'ダイレクト' ); ?></option>
+							<option value="selection_form"><?php echo esc_html( '選択フォーム' ); ?></option>
+						</select>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_migration_status"><?php echo esc_html( '移行ステータス' ); ?></label></th>
+					<td>
+						<select id="dcj_migration_status" name="dcj_migration_status">
+							<option value="pending"><?php echo esc_html( 'ペンディング' ); ?></option>
+							<option value="converted"><?php echo esc_html( '変換済み' ); ?></option>
+							<option value="keep_direct"><?php echo esc_html( 'ダイレクト維持' ); ?></option>
+							<option value="disabled"><?php echo esc_html( '無効' ); ?></option>
+						</select>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_title"><?php echo esc_html( 'タイトル' ); ?> *</label></th>
+					<td><input type="text" id="dcj_title" name="dcj_title" value="" required /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_description"><?php echo esc_html( '説明' ); ?></label></th>
+					<td><textarea id="dcj_description" name="dcj_description" rows="4" cols="50"></textarea></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_thumbnail_url"><?php echo esc_html( 'サムネイルURL' ); ?></label></th>
+					<td><input type="url" id="dcj_thumbnail_url" name="dcj_thumbnail_url" value="" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_pdf_url"><?php echo esc_html( 'PDF URL' ); ?> *</label></th>
+					<td><input type="url" id="dcj_pdf_url" name="dcj_pdf_url" value="" required /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_mail_subject"><?php echo esc_html( 'メール件名' ); ?> *</label></th>
+					<td><input type="text" id="dcj_mail_subject" name="dcj_mail_subject" value="" required /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_mail_body"><?php echo esc_html( 'メール本文' ); ?> *</label></th>
+					<td><textarea id="dcj_mail_body" name="dcj_mail_body" rows="6" cols="50" required></textarea></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_button_text"><?php echo esc_html( 'ボタンテキスト' ); ?></label></th>
+					<td><input type="text" id="dcj_button_text" name="dcj_button_text" value="" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_label_text"><?php echo esc_html( 'ラベルテキスト' ); ?></label></th>
+					<td><input type="text" id="dcj_label_text" name="dcj_label_text" value="" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_note_text"><?php echo esc_html( '注記テキスト' ); ?></label></th>
+					<td><textarea id="dcj_note_text" name="dcj_note_text" rows="3" cols="50"></textarea></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_success_message"><?php echo esc_html( '成功メッセージ' ); ?></label></th>
+					<td><textarea id="dcj_success_message" name="dcj_success_message" rows="2" cols="50"></textarea></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_duplicate_message"><?php echo esc_html( '重複メッセージ' ); ?></label></th>
+					<td><textarea id="dcj_duplicate_message" name="dcj_duplicate_message" rows="2" cols="50"></textarea></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_disabled_message"><?php echo esc_html( '無効メッセージ' ); ?></label></th>
+					<td><textarea id="dcj_disabled_message" name="dcj_disabled_message" rows="2" cols="50"></textarea></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_terms_type"><?php echo esc_html( '利用規約タイプ' ); ?></label></th>
+					<td><input type="text" id="dcj_terms_type" name="dcj_terms_type" value="" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_terms_text"><?php echo esc_html( '利用規約テキスト' ); ?></label></th>
+					<td><textarea id="dcj_terms_text" name="dcj_terms_text" rows="3" cols="50"></textarea></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_source_page_url"><?php echo esc_html( 'ソースページURL' ); ?></label></th>
+					<td><input type="url" id="dcj_source_page_url" name="dcj_source_page_url" value="" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_kdp_asin"><?php echo esc_html( 'KDP ASIN' ); ?></label></th>
+					<td><input type="text" id="dcj_kdp_asin" name="dcj_kdp_asin" value="" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_kdp_title"><?php echo esc_html( 'KDPタイトル' ); ?></label></th>
+					<td><input type="text" id="dcj_kdp_title" name="dcj_kdp_title" value="" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_kdp_url"><?php echo esc_html( 'KDP URL' ); ?></label></th>
+					<td><input type="url" id="dcj_kdp_url" name="dcj_kdp_url" value="" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_admin_note"><?php echo esc_html( '管理メモ' ); ?></label></th>
+					<td><textarea id="dcj_admin_note" name="dcj_admin_note" rows="3" cols="50"></textarea></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_enabled"><?php echo esc_html( '有効' ); ?></label></th>
+					<td><input type="checkbox" id="dcj_enabled" name="dcj_enabled" value="1" checked /></td>
+				</tr>
+			</table>
+
+			<input type="hidden" name="dcj_fpm_add_pdf_item_nonce" value="<?php echo esc_attr( $nonce ); ?>" />
+			<input type="hidden" name="dcj_fpm_add_pdf_item_submit" value="1" />
+
+			<?php submit_button( '追加' ); ?>
+		</form>
 		<?php
 	}
 
