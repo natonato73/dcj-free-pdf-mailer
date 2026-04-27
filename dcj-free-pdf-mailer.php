@@ -54,6 +54,9 @@ class DCJ_Free_PDF_Mailer {
 
 		// CSSと点滅アニメーションを出力
 		add_action( 'wp_head', array( $this, 'output_styles' ) );
+
+		// 管理画面メニュー登録
+		add_action( 'admin_menu', array( $this, 'register_admin_menu' ) );
 	}
 
 	/**
@@ -635,6 +638,96 @@ class DCJ_Free_PDF_Mailer {
 			}
 		}
 		</style>
+		<?php
+	}
+
+	/**
+	 * WordPress管理画面にメニューを登録します。
+	 */
+	public function register_admin_menu() {
+
+		// 権限チェック
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return;
+		}
+
+		// トップレベルメニューを追加
+		add_menu_page(
+			'DCJ Free PDF Mailer',               // ページタイトル
+			'DCJ Free PDF',                      // メニュー表示名
+			'manage_options',                    // 権限
+			'dcj-free-pdf-mailer',               // メニュースラッグ
+			array( $this, 'display_admin_page' ), // コールバック
+			'dashicons-pdf'                      // アイコン
+		);
+	}
+
+	/**
+	 * 管理画面一覧ページを表示します。
+	 */
+	public function display_admin_page() {
+
+		// 権限チェック
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'dcj-free-pdf-mailer' ) );
+		}
+
+		// PDF設定を取得
+		$pdf_items = $this->get_pdf_items();
+
+		?>
+		<div class="wrap">
+			<h1><?php echo esc_html( 'DCJ Free PDF Mailer' ); ?></h1>
+			
+			<table class="widefat striped">
+				<thead>
+					<tr>
+						<th><?php echo esc_html( '管理ID' ); ?></th>
+						<th><?php echo esc_html( '言語' ); ?></th>
+						<th><?php echo esc_html( '種類' ); ?></th>
+						<th><?php echo esc_html( 'カテゴリ' ); ?></th>
+						<th><?php echo esc_html( '対象' ); ?></th>
+						<th><?php echo esc_html( 'ボリューム' ); ?></th>
+						<th><?php echo esc_html( '表示タイトル' ); ?></th>
+						<th><?php echo esc_html( '配布方式' ); ?></th>
+						<th><?php echo esc_html( '移行状態' ); ?></th>
+						<th><?php echo esc_html( '有効/無効' ); ?></th>
+						<th><?php echo esc_html( '管理メモ' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+					<?php
+					foreach ( $pdf_items as $pdf_id => $pdf_item ) {
+						$enabled        = ! empty( $pdf_item['enabled'] ) ? '有効' : '無効';
+						$lang           = ! empty( $pdf_item['lang'] ) ? $pdf_item['lang'] : '-';
+						$type           = ! empty( $pdf_item['type'] ) ? $pdf_item['type'] : '-';
+						$category       = ! empty( $pdf_item['category'] ) ? $pdf_item['category'] : '-';
+						$audience       = ! empty( $pdf_item['audience'] ) ? $pdf_item['audience'] : '-';
+						$volume_label   = ! empty( $pdf_item['volume_label'] ) ? $pdf_item['volume_label'] : '-';
+						$title          = ! empty( $pdf_item['title'] ) ? $pdf_item['title'] : '-';
+						$delivery       = ! empty( $pdf_item['delivery_method'] ) ? $pdf_item['delivery_method'] : '-';
+						$migration      = ! empty( $pdf_item['migration_status'] ) ? $pdf_item['migration_status'] : '-';
+						$admin_note     = ! empty( $pdf_item['admin_note'] ) ? $pdf_item['admin_note'] : '-';
+						?>
+						<tr>
+							<td><?php echo esc_html( $pdf_id ); ?></td>
+							<td><?php echo esc_html( $lang ); ?></td>
+							<td><?php echo esc_html( $type ); ?></td>
+							<td><?php echo esc_html( $category ); ?></td>
+							<td><?php echo esc_html( $audience ); ?></td>
+							<td><?php echo esc_html( $volume_label ); ?></td>
+							<td><?php echo esc_html( $title ); ?></td>
+							<td><?php echo esc_html( $delivery ); ?></td>
+							<td><?php echo esc_html( $migration ); ?></td>
+							<td><?php echo esc_html( $enabled ); ?></td>
+							<td><?php echo esc_html( $admin_note ); ?></td>
+						</tr>
+						<?php
+					}
+					?>
+				</tbody>
+			</table>
+		</div>
 		<?php
 	}
 }
