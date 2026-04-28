@@ -1102,7 +1102,7 @@ class DCJ_Free_PDF_Mailer {
 	private function render_add_pdf_form() {
 
 		$nonce = wp_create_nonce( 'dcj_fpm_add_pdf_item' );
-		$default_mail_body = "こんにちは。\n\nDream Coloring Journey の無料PDFにお申し込みいただき、ありがとうございます。\n\n以下のリンクからPDFをダウンロードできます。\n\n{{pdf_url}}\n\n塗り絵の時間を楽しんでいただければ嬉しいです。\n\nDream Coloring Journey";
+		$default_mail_body = "こんにちは。\n\n{{title}} にお申し込みいただき、ありがとうございます。\n\n以下のリンクからPDFをダウンロードできます。\n\n{{pdf_url}}\n\n利用条件：\n{{terms_text}}\n\n塗り絵の時間を楽しんでいただければ嬉しいです。\n\nDream Coloring Journey";
 
 		?>
 		<h2><?php echo esc_html( '新規PDF設定を追加' ); ?></h2>
@@ -1362,6 +1362,7 @@ class DCJ_Free_PDF_Mailer {
 			admin_url( 'admin.php' )
 		);
 		$edit_lang = ! empty( $pdf_item['lang'] ) ? $pdf_item['lang'] : 'ja';
+		$default_mail_body   = 'en' === $edit_lang ? "Hello,\n\nThank you for requesting {{title}}.\n\nYou can download your PDF from the link below:\n\n{{pdf_url}}\n\nTerms of use:\n{{terms_text}}\n\nWe hope you enjoy your coloring time.\n\nDream Coloring Journey" : "こんにちは。\n\n{{title}} にお申し込みいただき、ありがとうございます。\n\n以下のリンクからPDFをダウンロードできます。\n\n{{pdf_url}}\n\n利用条件：\n{{terms_text}}\n\n塗り絵の時間を楽しんでいただければ嬉しいです。\n\nDream Coloring Journey";
 		$default_button_text = 'en' === $edit_lang ? 'Send' : '送信する';
 		$default_label_text  = 'en' === $edit_lang ? 'Email address' : 'メールアドレス';
 		$default_note_text   = 'en' === $edit_lang ? 'Your email address will be used to send this free PDF.' : 'ご入力いただいたメールアドレスは、無料PDFのご案内に使用します。';
@@ -1376,6 +1377,7 @@ class DCJ_Free_PDF_Mailer {
 		$duplicate_message         = ! empty( $pdf_item['duplicate_message'] ) ? $pdf_item['duplicate_message'] : $default_duplicate_message;
 		$disabled_message          = ! empty( $pdf_item['disabled_message'] ) ? $pdf_item['disabled_message'] : $default_disabled_message;
 		$terms_text                = ! empty( $pdf_item['terms_text'] ) ? $pdf_item['terms_text'] : $default_terms_text;
+		$mail_body                 = ! empty( $pdf_item['mail_body'] ) ? $pdf_item['mail_body'] : $default_mail_body;
 
 		?>
 		<h2><?php echo esc_html( 'PDF設定を編集' ); ?></h2>
@@ -1493,7 +1495,7 @@ class DCJ_Free_PDF_Mailer {
 				<tr>
 					<th scope="row"><label for="dcj_edit_mail_body"><?php echo esc_html( 'メール本文' ); ?> *</label></th>
 					<td>
-						<textarea id="dcj_edit_mail_body" name="dcj_mail_body" rows="6" cols="50" required><?php echo esc_textarea( ! empty( $pdf_item['mail_body'] ) ? $pdf_item['mail_body'] : '' ); ?></textarea>
+						<textarea id="dcj_edit_mail_body" name="dcj_mail_body" rows="6" cols="50" required><?php echo esc_textarea( $mail_body ); ?></textarea>
 						<p class="description"><?php echo esc_html( '受信者に届くメール本文です。{{title}}、{{pdf_url}}、{{terms_text}} などの置換タグが使えます。' ); ?></p>
 					</td>
 				</tr>
@@ -1653,6 +1655,10 @@ class DCJ_Free_PDF_Mailer {
 			return;
 		}
 
+		$preview_lang      = ! empty( $preview_pdf_item['lang'] ) ? $preview_pdf_item['lang'] : 'ja';
+		$default_mail_body = 'en' === $preview_lang ? "Hello,\n\nThank you for requesting {{title}}.\n\nYou can download your PDF from the link below:\n\n{{pdf_url}}\n\nTerms of use:\n{{terms_text}}\n\nWe hope you enjoy your coloring time.\n\nDream Coloring Journey" : "こんにちは。\n\n{{title}} にお申し込みいただき、ありがとうございます。\n\n以下のリンクからPDFをダウンロードできます。\n\n{{pdf_url}}\n\n利用条件：\n{{terms_text}}\n\n塗り絵の時間を楽しんでいただければ嬉しいです。\n\nDream Coloring Journey";
+		$preview_mail_body = ! empty( $preview_pdf_item['mail_body'] ) ? $preview_pdf_item['mail_body'] : $default_mail_body;
+
 		$this->output_styles();
 
 		?>
@@ -1670,7 +1676,7 @@ class DCJ_Free_PDF_Mailer {
 		<h3><?php echo esc_html( '受信メール件名' ); ?></h3>
 		<p><?php echo esc_html( ! empty( $preview_pdf_item['mail_subject'] ) ? $preview_pdf_item['mail_subject'] : '-' ); ?></p>
 		<h3><?php echo esc_html( '受信メール本文' ); ?></h3>
-		<pre style="white-space: pre-wrap; background: #fff; border: 1px solid #ccd0d4; padding: 12px;"><?php echo esc_html( ! empty( $preview_pdf_item['mail_body'] ) ? $preview_pdf_item['mail_body'] : '-' ); ?></pre>
+		<pre style="white-space: pre-wrap; background: #fff; border: 1px solid #ccd0d4; padding: 12px;"><?php echo esc_html( $preview_mail_body ); ?></pre>
 		<?php
 	}
 
