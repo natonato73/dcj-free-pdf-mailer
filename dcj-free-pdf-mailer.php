@@ -1049,7 +1049,7 @@ class DCJ_Free_PDF_Mailer {
 		$audience_label      = ! empty( $_POST['dcj_audience_label'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_audience_label'] ) ) : '';
 		$volume_label        = ! empty( $_POST['dcj_volume_label'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_volume_label'] ) ) : '';
 		$sort_order          = ! empty( $_POST['dcj_sort_order'] ) ? absint( wp_unslash( $_POST['dcj_sort_order'] ) ) : 0;
-		$placement_type      = ! empty( $_POST['dcj_placement_type'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_placement_type'] ) ) : '';
+		$placement_type      = ! empty( $_POST['dcj_placement_type'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_placement_type'] ) ) : 'article_inline';
 		$delivery_method     = ! empty( $_POST['dcj_delivery_method'] ) ? sanitize_key( wp_unslash( $_POST['dcj_delivery_method'] ) ) : 'email';
 		$migration_status    = ! empty( $_POST['dcj_migration_status'] ) ? sanitize_key( wp_unslash( $_POST['dcj_migration_status'] ) ) : 'pending';
 		$enabled             = ! empty( $_POST['dcj_enabled'] ) ? true : false;
@@ -1176,21 +1176,6 @@ class DCJ_Free_PDF_Mailer {
 					<td><input type="text" id="dcj_volume_label" name="dcj_volume_label" value="<?php echo esc_attr( 'PDF 5枚セット' ); ?>" /></td>
 				</tr>
 				<tr>
-					<th scope="row"><label for="dcj_sort_order"><?php echo esc_html( 'ソート順序' ); ?></label></th>
-					<td><input type="number" id="dcj_sort_order" name="dcj_sort_order" value="0" /></td>
-				</tr>
-				<tr>
-					<th scope="row"><label for="dcj_placement_type"><?php echo esc_html( '配置タイプ' ); ?></label></th>
-					<td>
-						<select id="dcj_placement_type" name="dcj_placement_type">
-							<option value="official_freebie_page"><?php echo esc_html( '公式無料DLページ' ); ?></option>
-							<option value="blog_article"><?php echo esc_html( 'ブログ記事' ); ?></option>
-							<option value="landing_page"><?php echo esc_html( 'ランディングページ' ); ?></option>
-							<option value="other"><?php echo esc_html( 'その他' ); ?></option>
-						</select>
-					</td>
-				</tr>
-				<tr>
 					<th scope="row"><label for="dcj_delivery_method"><?php echo esc_html( '配布方式' ); ?></label></th>
 					<td>
 						<select id="dcj_delivery_method" name="dcj_delivery_method">
@@ -1236,6 +1221,49 @@ class DCJ_Free_PDF_Mailer {
 					<td><textarea id="dcj_mail_body" name="dcj_mail_body" rows="8" cols="50" required><?php echo esc_textarea( $default_mail_body ); ?></textarea></td>
 				</tr>
 				<tr>
+					<th scope="row"><label for="dcj_button_text"><?php echo esc_html( 'ボタンテキスト' ); ?></label></th>
+					<td><input type="text" id="dcj_button_text" name="dcj_button_text" value="<?php echo esc_attr( '送信する' ); ?>" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_label_text"><?php echo esc_html( 'ラベルテキスト' ); ?></label></th>
+					<td><input type="text" id="dcj_label_text" name="dcj_label_text" value="<?php echo esc_attr( 'メールアドレス' ); ?>" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_note_text"><?php echo esc_html( '注記テキスト' ); ?></label></th>
+					<td><textarea id="dcj_note_text" name="dcj_note_text" rows="3" cols="50"><?php echo esc_textarea( 'ご入力いただいたメールアドレスは、無料PDFのご案内に使用します。' ); ?></textarea></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_success_message"><?php echo esc_html( '成功メッセージ' ); ?></label></th>
+					<td><textarea id="dcj_success_message" name="dcj_success_message" rows="2" cols="50"><?php echo esc_textarea( '無料PDFのご案内メールを送信しました。メールボックスをご確認ください。' ); ?></textarea></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_duplicate_message"><?php echo esc_html( '重複メッセージ' ); ?></label></th>
+					<td><textarea id="dcj_duplicate_message" name="dcj_duplicate_message" rows="2" cols="50"><?php echo esc_textarea( 'すでにお申し込み済みです。メールボックスをご確認ください。' ); ?></textarea></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_disabled_message"><?php echo esc_html( '無効メッセージ' ); ?></label></th>
+					<td><textarea id="dcj_disabled_message" name="dcj_disabled_message" rows="2" cols="50"><?php echo esc_textarea( 'この無料PDFは現在配布を停止しています。' ); ?></textarea></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_terms_type"><?php echo esc_html( '利用規約タイプ' ); ?></label></th>
+					<td>
+						<select id="dcj_terms_type" name="dcj_terms_type">
+							<option value="personal_use_only"><?php echo esc_html( '個人利用のみ' ); ?></option>
+							<option value="classroom_ok"><?php echo esc_html( '教室利用可' ); ?></option>
+							<option value="none"><?php echo esc_html( 'なし' ); ?></option>
+							<option value="other"><?php echo esc_html( 'その他' ); ?></option>
+						</select>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_terms_text"><?php echo esc_html( '利用規約テキスト' ); ?></label></th>
+					<td><textarea id="dcj_terms_text" name="dcj_terms_text" rows="3" cols="50"><?php echo esc_textarea( '家庭内での個人利用に限ります。再配布・二次配布・商用利用は禁止です。' ); ?></textarea></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_admin_note"><?php echo esc_html( '管理メモ' ); ?></label></th>
+					<td><textarea id="dcj_admin_note" name="dcj_admin_note" rows="3" cols="50"><?php echo esc_textarea( '管理用メモ。公開フォームには表示されません。' ); ?></textarea></td>
+				</tr>
+				<tr>
 					<th scope="row"><label for="dcj_enabled"><?php echo esc_html( '有効' ); ?></label></th>
 					<td><input type="checkbox" id="dcj_enabled" name="dcj_enabled" value="1" checked /></td>
 				</tr>
@@ -1243,45 +1271,11 @@ class DCJ_Free_PDF_Mailer {
 
 			<details>
 				<summary><?php echo esc_html( '詳細設定' ); ?></summary>
+				<p><?php echo esc_html( 'この項目は任意です。将来、配布元記事の管理、関連KDP書籍リンク、カード一覧の並び順などに使うための項目です。通常は空欄でも問題ありません。' ); ?></p>
 				<table class="form-table">
 					<tr>
-						<th scope="row"><label for="dcj_button_text"><?php echo esc_html( 'ボタンテキスト' ); ?></label></th>
-						<td><input type="text" id="dcj_button_text" name="dcj_button_text" value="<?php echo esc_attr( '送信する' ); ?>" /></td>
-					</tr>
-					<tr>
-						<th scope="row"><label for="dcj_label_text"><?php echo esc_html( 'ラベルテキスト' ); ?></label></th>
-						<td><input type="text" id="dcj_label_text" name="dcj_label_text" value="<?php echo esc_attr( 'メールアドレス' ); ?>" /></td>
-					</tr>
-					<tr>
-						<th scope="row"><label for="dcj_note_text"><?php echo esc_html( '注記テキスト' ); ?></label></th>
-						<td><textarea id="dcj_note_text" name="dcj_note_text" rows="3" cols="50"><?php echo esc_textarea( 'ご入力いただいたメールアドレスは、無料PDFのご案内に使用します。' ); ?></textarea></td>
-					</tr>
-					<tr>
-						<th scope="row"><label for="dcj_success_message"><?php echo esc_html( '成功メッセージ' ); ?></label></th>
-						<td><textarea id="dcj_success_message" name="dcj_success_message" rows="2" cols="50"><?php echo esc_textarea( '無料PDFのご案内メールを送信しました。メールボックスをご確認ください。' ); ?></textarea></td>
-					</tr>
-					<tr>
-						<th scope="row"><label for="dcj_duplicate_message"><?php echo esc_html( '重複メッセージ' ); ?></label></th>
-						<td><textarea id="dcj_duplicate_message" name="dcj_duplicate_message" rows="2" cols="50"><?php echo esc_textarea( 'すでにお申し込み済みです。メールボックスをご確認ください。' ); ?></textarea></td>
-					</tr>
-					<tr>
-						<th scope="row"><label for="dcj_disabled_message"><?php echo esc_html( '無効メッセージ' ); ?></label></th>
-						<td><textarea id="dcj_disabled_message" name="dcj_disabled_message" rows="2" cols="50"><?php echo esc_textarea( 'この無料PDFは現在配布を停止しています。' ); ?></textarea></td>
-					</tr>
-					<tr>
-						<th scope="row"><label for="dcj_terms_type"><?php echo esc_html( '利用規約タイプ' ); ?></label></th>
-						<td>
-							<select id="dcj_terms_type" name="dcj_terms_type">
-								<option value="personal_use_only"><?php echo esc_html( '個人利用のみ' ); ?></option>
-								<option value="classroom_ok"><?php echo esc_html( '教室利用可' ); ?></option>
-								<option value="none"><?php echo esc_html( 'なし' ); ?></option>
-								<option value="other"><?php echo esc_html( 'その他' ); ?></option>
-							</select>
-						</td>
-					</tr>
-					<tr>
-						<th scope="row"><label for="dcj_terms_text"><?php echo esc_html( '利用規約テキスト' ); ?></label></th>
-						<td><textarea id="dcj_terms_text" name="dcj_terms_text" rows="3" cols="50"><?php echo esc_textarea( '家庭内での個人利用に限ります。再配布・二次配布・商用利用は禁止です。' ); ?></textarea></td>
+						<th scope="row"><label for="dcj_sort_order"><?php echo esc_html( 'ソート順序' ); ?></label></th>
+						<td><input type="number" id="dcj_sort_order" name="dcj_sort_order" value="0" /></td>
 					</tr>
 					<tr>
 						<th scope="row"><label for="dcj_source_page_url"><?php echo esc_html( 'ソースページURL' ); ?></label></th>
@@ -1298,10 +1292,6 @@ class DCJ_Free_PDF_Mailer {
 					<tr>
 						<th scope="row"><label for="dcj_kdp_url"><?php echo esc_html( 'KDP URL' ); ?></label></th>
 						<td><input type="url" id="dcj_kdp_url" name="dcj_kdp_url" value="" placeholder="<?php echo esc_attr( 'https://www.amazon.co.jp/dp/B0XXXXXXXX' ); ?>" /></td>
-					</tr>
-					<tr>
-						<th scope="row"><label for="dcj_admin_note"><?php echo esc_html( '管理メモ' ); ?></label></th>
-						<td><textarea id="dcj_admin_note" name="dcj_admin_note" rows="3" cols="50"><?php echo esc_textarea( '管理用メモ。公開フォームには表示されません。' ); ?></textarea></td>
 					</tr>
 				</table>
 			</details>
@@ -1354,7 +1344,13 @@ class DCJ_Free_PDF_Mailer {
 				</tr>
 				<tr>
 					<th scope="row"><label for="dcj_edit_type"><?php echo esc_html( '種類' ); ?></label></th>
-					<td><input type="text" id="dcj_edit_type" name="dcj_type" value="<?php echo esc_attr( ! empty( $pdf_item['type'] ) ? $pdf_item['type'] : 'set' ); ?>" /></td>
+					<td>
+						<select id="dcj_edit_type" name="dcj_type">
+							<option value="set" <?php selected( ! empty( $pdf_item['type'] ) ? $pdf_item['type'] : 'set', 'set' ); ?>><?php echo esc_html( 'セット' ); ?></option>
+							<option value="single" <?php selected( ! empty( $pdf_item['type'] ) ? $pdf_item['type'] : 'set', 'single' ); ?>><?php echo esc_html( '単品' ); ?></option>
+							<option value="bonus" <?php selected( ! empty( $pdf_item['type'] ) ? $pdf_item['type'] : 'set', 'bonus' ); ?>><?php echo esc_html( '特典' ); ?></option>
+						</select>
+					</td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="dcj_edit_category"><?php echo esc_html( 'カテゴリ' ); ?></label></th>
@@ -1368,7 +1364,14 @@ class DCJ_Free_PDF_Mailer {
 				</tr>
 				<tr>
 					<th scope="row"><label for="dcj_edit_audience"><?php echo esc_html( '対象' ); ?></label></th>
-					<td><input type="text" id="dcj_edit_audience" name="dcj_audience" value="<?php echo esc_attr( ! empty( $pdf_item['audience'] ) ? $pdf_item['audience'] : '' ); ?>" /></td>
+					<td>
+						<select id="dcj_edit_audience" name="dcj_audience">
+							<option value="preschool" <?php selected( ! empty( $pdf_item['audience'] ) ? $pdf_item['audience'] : 'preschool', 'preschool' ); ?>><?php echo esc_html( '幼児向け' ); ?></option>
+							<option value="kids" <?php selected( ! empty( $pdf_item['audience'] ) ? $pdf_item['audience'] : 'preschool', 'kids' ); ?>><?php echo esc_html( '子ども向け' ); ?></option>
+							<option value="family" <?php selected( ! empty( $pdf_item['audience'] ) ? $pdf_item['audience'] : 'preschool', 'family' ); ?>><?php echo esc_html( '親子向け' ); ?></option>
+							<option value="adults" <?php selected( ! empty( $pdf_item['audience'] ) ? $pdf_item['audience'] : 'preschool', 'adults' ); ?>><?php echo esc_html( '大人向け' ); ?></option>
+						</select>
+					</td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="dcj_edit_audience_label"><?php echo esc_html( '対象ラベル' ); ?></label></th>
@@ -1377,14 +1380,6 @@ class DCJ_Free_PDF_Mailer {
 				<tr>
 					<th scope="row"><label for="dcj_edit_volume_label"><?php echo esc_html( 'ボリュームラベル' ); ?></label></th>
 					<td><input type="text" id="dcj_edit_volume_label" name="dcj_volume_label" value="<?php echo esc_attr( ! empty( $pdf_item['volume_label'] ) ? $pdf_item['volume_label'] : '' ); ?>" /></td>
-				</tr>
-				<tr>
-					<th scope="row"><label for="dcj_edit_sort_order"><?php echo esc_html( 'ソート順序' ); ?></label></th>
-					<td><input type="number" id="dcj_edit_sort_order" name="dcj_sort_order" value="<?php echo esc_attr( isset( $pdf_item['sort_order'] ) ? absint( $pdf_item['sort_order'] ) : 0 ); ?>" /></td>
-				</tr>
-				<tr>
-					<th scope="row"><label for="dcj_edit_placement_type"><?php echo esc_html( '配置タイプ' ); ?></label></th>
-					<td><input type="text" id="dcj_edit_placement_type" name="dcj_placement_type" value="<?php echo esc_attr( ! empty( $pdf_item['placement_type'] ) ? $pdf_item['placement_type'] : '' ); ?>" /></td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="dcj_edit_delivery_method"><?php echo esc_html( '配布方式' ); ?></label></th>
@@ -1457,32 +1452,53 @@ class DCJ_Free_PDF_Mailer {
 				</tr>
 				<tr>
 					<th scope="row"><label for="dcj_edit_terms_type"><?php echo esc_html( '利用規約タイプ' ); ?></label></th>
-					<td><input type="text" id="dcj_edit_terms_type" name="dcj_terms_type" value="<?php echo esc_attr( ! empty( $pdf_item['terms_type'] ) ? $pdf_item['terms_type'] : '' ); ?>" /></td>
+					<td>
+						<select id="dcj_edit_terms_type" name="dcj_terms_type">
+							<option value="personal_use_only" <?php selected( ! empty( $pdf_item['terms_type'] ) ? $pdf_item['terms_type'] : 'personal_use_only', 'personal_use_only' ); ?>><?php echo esc_html( '個人利用のみ' ); ?></option>
+							<option value="classroom_ok" <?php selected( ! empty( $pdf_item['terms_type'] ) ? $pdf_item['terms_type'] : 'personal_use_only', 'classroom_ok' ); ?>><?php echo esc_html( '教室利用可' ); ?></option>
+							<option value="none" <?php selected( ! empty( $pdf_item['terms_type'] ) ? $pdf_item['terms_type'] : 'personal_use_only', 'none' ); ?>><?php echo esc_html( 'なし' ); ?></option>
+							<option value="other" <?php selected( ! empty( $pdf_item['terms_type'] ) ? $pdf_item['terms_type'] : 'personal_use_only', 'other' ); ?>><?php echo esc_html( 'その他' ); ?></option>
+						</select>
+					</td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="dcj_edit_terms_text"><?php echo esc_html( '利用規約テキスト' ); ?></label></th>
 					<td><textarea id="dcj_edit_terms_text" name="dcj_terms_text" rows="3" cols="50"><?php echo esc_textarea( ! empty( $pdf_item['terms_text'] ) ? $pdf_item['terms_text'] : '' ); ?></textarea></td>
 				</tr>
 				<tr>
-					<th scope="row"><label for="dcj_edit_source_page_url"><?php echo esc_html( 'ソースページURL' ); ?></label></th>
-					<td><input type="url" id="dcj_edit_source_page_url" name="dcj_source_page_url" value="<?php echo esc_url( ! empty( $pdf_item['source_page_url'] ) ? $pdf_item['source_page_url'] : '' ); ?>" /></td>
-				</tr>
-				<tr>
-					<th scope="row"><label for="dcj_edit_kdp_asin"><?php echo esc_html( 'KDP ASIN' ); ?></label></th>
-					<td><input type="text" id="dcj_edit_kdp_asin" name="dcj_kdp_asin" value="<?php echo esc_attr( ! empty( $pdf_item['kdp_asin'] ) ? $pdf_item['kdp_asin'] : '' ); ?>" /></td>
-				</tr>
-				<tr>
-					<th scope="row"><label for="dcj_edit_kdp_title"><?php echo esc_html( 'KDPタイトル' ); ?></label></th>
-					<td><input type="text" id="dcj_edit_kdp_title" name="dcj_kdp_title" value="<?php echo esc_attr( ! empty( $pdf_item['kdp_title'] ) ? $pdf_item['kdp_title'] : '' ); ?>" /></td>
-				</tr>
-				<tr>
-					<th scope="row"><label for="dcj_edit_kdp_url"><?php echo esc_html( 'KDP URL' ); ?></label></th>
-					<td><input type="url" id="dcj_edit_kdp_url" name="dcj_kdp_url" value="<?php echo esc_url( ! empty( $pdf_item['kdp_url'] ) ? $pdf_item['kdp_url'] : '' ); ?>" /></td>
-				</tr>
-				<tr>
 					<th scope="row"><label for="dcj_edit_admin_note"><?php echo esc_html( '管理メモ' ); ?></label></th>
 					<td><textarea id="dcj_edit_admin_note" name="dcj_admin_note" rows="3" cols="50"><?php echo esc_textarea( ! empty( $pdf_item['admin_note'] ) ? $pdf_item['admin_note'] : '' ); ?></textarea></td>
 				</tr>
+			</table>
+
+			<details>
+				<summary><?php echo esc_html( '詳細設定' ); ?></summary>
+				<p><?php echo esc_html( 'この項目は任意です。将来、配布元記事の管理、関連KDP書籍リンク、カード一覧の並び順などに使うための項目です。通常は空欄でも問題ありません。' ); ?></p>
+				<table class="form-table">
+					<tr>
+						<th scope="row"><label for="dcj_edit_sort_order"><?php echo esc_html( 'ソート順序' ); ?></label></th>
+						<td><input type="number" id="dcj_edit_sort_order" name="dcj_sort_order" value="<?php echo esc_attr( isset( $pdf_item['sort_order'] ) ? absint( $pdf_item['sort_order'] ) : 0 ); ?>" /></td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="dcj_edit_source_page_url"><?php echo esc_html( 'ソースページURL' ); ?></label></th>
+						<td><input type="url" id="dcj_edit_source_page_url" name="dcj_source_page_url" value="<?php echo esc_url( ! empty( $pdf_item['source_page_url'] ) ? $pdf_item['source_page_url'] : '' ); ?>" /></td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="dcj_edit_kdp_asin"><?php echo esc_html( 'KDP ASIN' ); ?></label></th>
+						<td><input type="text" id="dcj_edit_kdp_asin" name="dcj_kdp_asin" value="<?php echo esc_attr( ! empty( $pdf_item['kdp_asin'] ) ? $pdf_item['kdp_asin'] : '' ); ?>" /></td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="dcj_edit_kdp_title"><?php echo esc_html( 'KDPタイトル' ); ?></label></th>
+						<td><input type="text" id="dcj_edit_kdp_title" name="dcj_kdp_title" value="<?php echo esc_attr( ! empty( $pdf_item['kdp_title'] ) ? $pdf_item['kdp_title'] : '' ); ?>" /></td>
+					</tr>
+					<tr>
+						<th scope="row"><label for="dcj_edit_kdp_url"><?php echo esc_html( 'KDP URL' ); ?></label></th>
+						<td><input type="url" id="dcj_edit_kdp_url" name="dcj_kdp_url" value="<?php echo esc_url( ! empty( $pdf_item['kdp_url'] ) ? $pdf_item['kdp_url'] : '' ); ?>" /></td>
+					</tr>
+				</table>
+			</details>
+
+			<table class="form-table">
 				<tr>
 					<th scope="row"><label for="dcj_edit_enabled"><?php echo esc_html( '有効' ); ?></label></th>
 					<td><input type="checkbox" id="dcj_edit_enabled" name="dcj_enabled" value="1" <?php checked( ! empty( $pdf_item['enabled'] ) ); ?> /></td>
