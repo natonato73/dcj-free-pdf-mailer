@@ -35,6 +35,7 @@ class DCJ_Free_PDF_Mailer {
 	const DUPLICATE_CHECK_EXPIRE = 300; // 5分（秒）
 	const OPTION_PDF_ITEMS       = 'dcj_fpm_pdf_items';
 	const OPTION_SUBMISSION_LOGS = 'dcj_fpm_submission_logs';
+	const OPTION_MAIL_SETTINGS   = 'dcj_fpm_mail_settings';
 
 	/**
 	 * PDFIDごとの処理結果メッセージ
@@ -361,6 +362,11 @@ class DCJ_Free_PDF_Mailer {
 		$headers = array(
 			'Content-Type: text/plain; charset=UTF-8',
 		);
+		$mail_settings = $this->get_mail_settings();
+
+		if ( ! empty( $mail_settings['from_email'] ) ) {
+			$headers[] = 'From: ' . $mail_settings['from_name'] . ' <' . $mail_settings['from_email'] . '>';
+		}
 
 		$sent = wp_mail( $email, $subject, $body, $headers );
 		$this->save_submission_log( $email, $pdf_id, ! empty( $pdf_item['lang'] ) ? $pdf_item['lang'] : '', $sent ? 'success' : 'failed' );
@@ -426,6 +432,22 @@ class DCJ_Free_PDF_Mailer {
 		}
 
 		return array_slice( $logs, 0, absint( $limit ) );
+	}
+
+	/**
+	 * メール送信設定を取得します。
+	 *
+	 * @return array
+	 */
+	private function get_mail_settings() {
+
+		$settings = get_option( self::OPTION_MAIL_SETTINGS, array() );
+		$settings = is_array( $settings ) ? $settings : array();
+
+		return array(
+			'from_name'  => ! empty( $settings['from_name'] ) ? sanitize_text_field( $settings['from_name'] ) : 'Dream Coloring Journey',
+			'from_email' => ! empty( $settings['from_email'] ) ? sanitize_email( $settings['from_email'] ) : '',
+		);
 	}
 
 	/**
@@ -981,6 +1003,8 @@ class DCJ_Free_PDF_Mailer {
 			<div class="notice notice-info inline">
 				<p><?php echo esc_html( '現在のPDF設定は WordPress option に保存されています。第4-3段階では新規追加機能が実装されました。' ); ?></p>
 			</div>
+
+			<?php $this->render_mail_settings_form(); ?>
 			
 			<h2><?php echo esc_html( 'PDF設定一覧' ); ?></h2>
 			
@@ -1096,6 +1120,10 @@ class DCJ_Free_PDF_Mailer {
 			return false;
 		}
 
+		if ( ! empty( $_POST['dcj_fpm_mail_settings_submit'] ) ) {
+			return $this->handle_admin_mail_settings_submit();
+		}
+
 		$deleted = $this->handle_admin_delete_pdf_item();
 		if ( false !== $deleted ) {
 			return $deleted;
@@ -1181,6 +1209,70 @@ class DCJ_Free_PDF_Mailer {
 			set_transient( 'dcj_fpm_admin_error', 'PDF設定の保存に失敗しました。', 30 );
 			return false;
 		}
+	}
+
+	/**
+	 * メール送信設定フォームの保存を処理します。
+	 *
+	 * @return bool
+	 */
+	private function handle_admin_mail_settings_submit() {
+
+		if ( empty( $_POST['dcj_fpm_mail_settings_nonce'] ) ) {
+			return false;
+		}
+
+		$nonce = sanitize_text_field( wp_unslash( $_POST['dcj_fpm_mail_settings_nonce'] ) );
+		if ( ! wp_verify_nonce( $nonce, 'dcj_fpm_mail_settings' ) ) {
+			return false;
+		}
+
+		$from_name  = ! empty( $_POST['dcj_fpm_from_name'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_fpm_from_name'] ) ) : 'Dream Coloring Journey';
+		$from_email = ! empty( $_POST['dcj_fpm_from_email'] ) ? sanitize_email( wp_unslash( $_POST['dcj_fpm_from_email'] ) ) : '';
+
+		if ( ! empty( $from_email ) && ! is_email( $from_email ) ) {
+			set_transient( 'dcj_fpm_admin_error', '送信元メールアドレスの形式が正しくありません。', 30 );
+			return false;
+		}
+
+		update_option(
+			self::OPTION_MAIL_SETTINGS,
+			array(
+				'from_name'  => $from_name,
+				'from_email' => $from_email,
+			)
+		);
+
+		set_transient( 'dcj_fpm_admin_success', 'メール送信設定を保存しました。', 30 );
+		return true;
+	}
+
+	/**
+	 * メール送信設定フォームを表示します。
+	 */
+	private function render_mail_settings_form() {
+
+		$mail_settings = $this->get_mail_settings();
+
+		?>
+		<h2><?php echo esc_html( 'メール送信設定' ); ?></h2>
+		<p><?php echo esc_html( '送信元メールアドレスを設定すると、無料PDF案内メールのFromに反映されます。メール到達率を高めるには、WP Mail SMTP や FluentSMTP などのSMTP設定も併用してください。' ); ?></p>
+		<form method="post" action="">
+			<table class="form-table">
+				<tr>
+					<th scope="row"><label for="dcj_fpm_from_name"><?php echo esc_html( '送信者名' ); ?></label></th>
+					<td><input type="text" id="dcj_fpm_from_name" name="dcj_fpm_from_name" value="<?php echo esc_attr( $mail_settings['from_name'] ); ?>" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_fpm_from_email"><?php echo esc_html( '送信元メールアドレス' ); ?></label></th>
+					<td><input type="email" id="dcj_fpm_from_email" name="dcj_fpm_from_email" value="<?php echo esc_attr( $mail_settings['from_email'] ); ?>" /></td>
+				</tr>
+			</table>
+			<input type="hidden" name="dcj_fpm_mail_settings_nonce" value="<?php echo esc_attr( wp_create_nonce( 'dcj_fpm_mail_settings' ) ); ?>" />
+			<input type="hidden" name="dcj_fpm_mail_settings_submit" value="1" />
+			<?php submit_button( 'メール送信設定を保存' ); ?>
+		</form>
+		<?php
 	}
 
 	/**
