@@ -1198,13 +1198,16 @@ class DCJ_Free_PDF_Mailer {
 				</tr>
 				<tr>
 					<th scope="row"><label for="dcj_thumbnail_url"><?php echo esc_html( 'サムネイルURL' ); ?></label></th>
-					<td><input type="url" id="dcj_thumbnail_url" name="dcj_thumbnail_url" value="" placeholder="<?php echo esc_attr( 'https://example.com/thumbnail.jpg' ); ?>" /></td>
+					<td>
+						<input type="url" id="dcj_thumbnail_url" name="dcj_thumbnail_url" value="" placeholder="<?php echo esc_attr( 'https://example.com/thumbnail.jpg' ); ?>" />
+						<p class="description"><?php echo esc_html( '将来のカード表示や管理画面プレビュー用の画像URLです。現在のメール送信には使用しません。空欄でも問題ありません。' ); ?></p>
+					</td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="dcj_pdf_url"><?php echo esc_html( 'PDF URL' ); ?> *</label></th>
 					<td>
 						<input type="url" id="dcj_pdf_url" name="dcj_pdf_url" value="" placeholder="<?php echo esc_attr( 'https://example.com/free-pdf.pdf' ); ?>" required />
-						<p class="description"><?php echo esc_html( '受信メール本文の {{pdf_url}} に入ります。' ); ?></p>
+						<p class="description"><?php echo esc_html( '受信メール本文の {{pdf_url}} に入ります。必ずブラウザで直接開けるPDF URLを指定してください。/wp-content/uploads/dlm_uploads/ 配下など、直接アクセス禁止のURLは使用しないでください。' ); ?></p>
 					</td>
 				</tr>
 				<tr>
@@ -1245,7 +1248,7 @@ class DCJ_Free_PDF_Mailer {
 				<tr>
 					<th scope="row"><label for="dcj_success_message"><?php echo esc_html( '成功メッセージ' ); ?></label></th>
 					<td>
-						<textarea id="dcj_success_message" name="dcj_success_message" rows="2" cols="50"><?php echo esc_textarea( '無料PDFのご案内メールを送信しました。メールボックスをご確認ください。' ); ?></textarea>
+						<textarea id="dcj_success_message" name="dcj_success_message" rows="2" cols="50"><?php echo esc_textarea( '無料PDFのご案内メールを送信しました。メールボックスをご確認ください。メールが見つからない場合は、迷惑メールフォルダやプロモーションフォルダもご確認ください。' ); ?></textarea>
 						<p class="description"><?php echo esc_html( 'メール送信成功後、フォーム下に表示されます。' ); ?></p>
 					</td>
 				</tr>
@@ -1366,14 +1369,14 @@ class DCJ_Free_PDF_Mailer {
 		$default_button_text = 'en' === $edit_lang ? 'Send' : '送信する';
 		$default_label_text  = 'en' === $edit_lang ? 'Email address' : 'メールアドレス';
 		$default_note_text   = 'en' === $edit_lang ? 'Your email address will be used to send this free PDF.' : 'ご入力いただいたメールアドレスは、無料PDFのご案内に使用します。';
-		$default_success_message   = 'en' === $edit_lang ? 'Your free PDF email has been sent. Please check your inbox.' : '無料PDFのご案内メールを送信しました。メールボックスをご確認ください。';
+		$default_success_message   = 'en' === $edit_lang ? 'Your free PDF email has been sent. Please check your inbox. If you cannot find the email, please check your spam or promotions folder.' : '無料PDFのご案内メールを送信しました。メールボックスをご確認ください。メールが見つからない場合は、迷惑メールフォルダやプロモーションフォルダもご確認ください。';
 		$default_duplicate_message = 'en' === $edit_lang ? 'You have already requested this PDF. Please check your inbox.' : 'すでにお申し込み済みです。メールボックスをご確認ください。';
 		$default_disabled_message  = 'en' === $edit_lang ? 'This free PDF is currently unavailable.' : 'この無料PDFは現在配布を停止しています。';
 		$default_terms_text        = 'en' === $edit_lang ? 'For personal and family use only. Redistribution, resale, and commercial use are not allowed.' : '家庭内での個人利用に限ります。再配布・二次配布・商用利用は禁止です。';
 		$button_text               = ! empty( $pdf_item['button_text'] ) ? $pdf_item['button_text'] : $default_button_text;
 		$label_text                = ! empty( $pdf_item['label_text'] ) ? $pdf_item['label_text'] : $default_label_text;
 		$note_text                 = ! empty( $pdf_item['note_text'] ) ? $pdf_item['note_text'] : $default_note_text;
-		$success_message           = ! empty( $pdf_item['success_message'] ) ? $pdf_item['success_message'] : $default_success_message;
+		$success_message           = isset( $pdf_item['success_message'] ) && '' !== trim( (string) $pdf_item['success_message'] ) ? $pdf_item['success_message'] : $default_success_message;
 		$duplicate_message         = ! empty( $pdf_item['duplicate_message'] ) ? $pdf_item['duplicate_message'] : $default_duplicate_message;
 		$disabled_message          = ! empty( $pdf_item['disabled_message'] ) ? $pdf_item['disabled_message'] : $default_disabled_message;
 		$terms_text                = ! empty( $pdf_item['terms_text'] ) ? $pdf_item['terms_text'] : $default_terms_text;
@@ -1476,13 +1479,16 @@ class DCJ_Free_PDF_Mailer {
 				</tr>
 				<tr>
 					<th scope="row"><label for="dcj_edit_thumbnail_url"><?php echo esc_html( 'サムネイルURL' ); ?></label></th>
-					<td><input type="url" id="dcj_edit_thumbnail_url" name="dcj_thumbnail_url" value="<?php echo esc_url( ! empty( $pdf_item['thumbnail_url'] ) ? $pdf_item['thumbnail_url'] : '' ); ?>" /></td>
+					<td>
+						<input type="url" id="dcj_edit_thumbnail_url" name="dcj_thumbnail_url" value="<?php echo esc_url( ! empty( $pdf_item['thumbnail_url'] ) ? $pdf_item['thumbnail_url'] : '' ); ?>" />
+						<p class="description"><?php echo esc_html( '将来のカード表示や管理画面プレビュー用の画像URLです。現在のメール送信には使用しません。空欄でも問題ありません。' ); ?></p>
+					</td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="dcj_edit_pdf_url"><?php echo esc_html( 'PDF URL' ); ?> *</label></th>
 					<td>
 						<input type="url" id="dcj_edit_pdf_url" name="dcj_pdf_url" value="<?php echo esc_url( ! empty( $pdf_item['pdf_url'] ) ? $pdf_item['pdf_url'] : '' ); ?>" required />
-						<p class="description"><?php echo esc_html( '受信メール本文の {{pdf_url}} に入ります。' ); ?></p>
+						<p class="description"><?php echo esc_html( '受信メール本文の {{pdf_url}} に入ります。必ずブラウザで直接開けるPDF URLを指定してください。/wp-content/uploads/dlm_uploads/ 配下など、直接アクセス禁止のURLは使用しないでください。' ); ?></p>
 					</td>
 				</tr>
 				<tr>
