@@ -34,6 +34,7 @@ class DCJ_Free_PDF_Mailer {
 	const NONCE_NAME             = 'dcj_free_pdf_nonce';
 	const DUPLICATE_CHECK_EXPIRE = 300; // 5分（秒）
 	const OPTION_PDF_ITEMS       = 'dcj_fpm_pdf_items';
+	const OPTION_SUBMISSION_LOGS = 'dcj_fpm_submission_logs';
 
 	/**
 	 * PDFIDごとの処理結果メッセージ
@@ -360,6 +361,7 @@ class DCJ_Free_PDF_Mailer {
 		);
 
 		$sent = wp_mail( $email, $subject, $body, $headers );
+		$this->save_submission_log( $email, $pdf_id, ! empty( $pdf_item['lang'] ) ? $pdf_item['lang'] : '', $sent ? 'success' : 'failed' );
 
 		if ( $sent ) {
 			// 送信成功後、重複送信防止フラグを5分間保存
@@ -370,6 +372,58 @@ class DCJ_Free_PDF_Mailer {
 		} else {
 			self::$messages[ $pdf_id ] = $this->get_error_message( 'メール送信に失敗しました。Localのメール設定を確認してください。' );
 		}
+	}
+
+	/**
+	 * フォーム送信ログを保存します。
+	 *
+	 * @param string $email メールアドレス
+	 * @param string $pdf_id PDF識別ID
+	 * @param string $lang 言語
+	 * @param string $result 送信結果
+	 */
+	private function save_submission_log( $email, $pdf_id, $lang, $result ) {
+
+		$logs       = get_option( self::OPTION_SUBMISSION_LOGS, array() );
+		$logs       = is_array( $logs ) ? $logs : array();
+		$ip_address = '';
+
+		if ( ! empty( $_SERVER['REMOTE_ADDR'] ) ) {
+			$ip_address = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) );
+		}
+
+		array_unshift(
+			$logs,
+			array(
+				'datetime'   => current_time( 'mysql' ),
+				'email'      => sanitize_email( $email ),
+				'pdf_id'     => sanitize_key( $pdf_id ),
+				'lang'       => sanitize_key( $lang ),
+				'result'     => 'success' === $result ? 'success' : 'failed',
+				'ip_address' => $ip_address,
+			)
+		);
+
+		$logs = array_slice( $logs, 0, 200 );
+
+		update_option( self::OPTION_SUBMISSION_LOGS, $logs );
+	}
+
+	/**
+	 * フォーム送信ログを取得します。
+	 *
+	 * @param int $limit 取得件数
+	 * @return array
+	 */
+	private function get_submission_logs( $limit = 50 ) {
+
+		$logs = get_option( self::OPTION_SUBMISSION_LOGS, array() );
+
+		if ( ! is_array( $logs ) ) {
+			return array();
+		}
+
+		return array_slice( $logs, 0, absint( $limit ) );
 	}
 
 	/**
@@ -1022,6 +1076,8 @@ class DCJ_Free_PDF_Mailer {
 					<?php $this->render_admin_preview_form( $pdf_items, $edit_pdf_id ); ?>
 				</div>
 			</div>
+
+			<?php $this->render_submission_logs(); ?>
 		</div>
 		<?php
 	}
@@ -1196,6 +1252,46 @@ class DCJ_Free_PDF_Mailer {
 		}
 
 		return $pdf_id;
+	}
+
+	/**
+	 * 管理画面に送信ログ一覧を表示します。
+	 */
+	private function render_submission_logs() {
+
+		$logs = $this->get_submission_logs( 50 );
+
+		?>
+		<h2><?php echo esc_html( '送信ログ' ); ?></h2>
+		<?php if ( empty( $logs ) ) : ?>
+			<p><?php echo esc_html( 'まだ送信ログはありません。' ); ?></p>
+		<?php else : ?>
+			<table class="widefat striped">
+				<thead>
+					<tr>
+						<th><?php echo esc_html( '日時' ); ?></th>
+						<th><?php echo esc_html( 'メールアドレス' ); ?></th>
+						<th><?php echo esc_html( 'PDF ID' ); ?></th>
+						<th><?php echo esc_html( '言語' ); ?></th>
+						<th><?php echo esc_html( '結果' ); ?></th>
+						<th><?php echo esc_html( 'IPアドレス' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+					<?php foreach ( $logs as $log ) : ?>
+						<tr>
+							<td><?php echo esc_html( ! empty( $log['datetime'] ) ? $log['datetime'] : '' ); ?></td>
+							<td><?php echo esc_html( ! empty( $log['email'] ) ? $log['email'] : '' ); ?></td>
+							<td><?php echo esc_html( ! empty( $log['pdf_id'] ) ? $log['pdf_id'] : '' ); ?></td>
+							<td><?php echo esc_html( ! empty( $log['lang'] ) ? $log['lang'] : '' ); ?></td>
+							<td><?php echo esc_html( ! empty( $log['result'] ) ? $log['result'] : '' ); ?></td>
+							<td><?php echo esc_html( ! empty( $log['ip_address'] ) ? $log['ip_address'] : '' ); ?></td>
+						</tr>
+					<?php endforeach; ?>
+				</tbody>
+			</table>
+		<?php endif; ?>
+		<?php
 	}
 
 	/**
