@@ -5,7 +5,7 @@
 - Local development: LocalWP
 - Runtime target: WordPress plugin
 - Main plugin file: `dcj-free-pdf-mailer.php`
-- Repository latest confirmed commit: `3573726 feat: add submission log tracking`
+- Repository latest confirmed commit: `a24d8a1 feat: add newsletter opt-in tracking`
 
 Do not store production admin URLs, email addresses, passwords, API keys, database credentials, or other secrets in this repository.
 
@@ -26,8 +26,11 @@ Do not store production admin URLs, email addresses, passwords, API keys, databa
 - Select PDF URLs and thumbnail URLs from the WordPress Media Library.
 - Switch default new-form text between Japanese and English.
 - Send PDF download links by email.
+- Show an optional newsletter opt-in checkbox on the frontend form.
 - Save send results as submission logs.
+- Save `newsletter_optin` in submission logs.
 - Display recent submission logs in the admin screen.
+- Include opt-in status in admin logs and CSV export.
 
 ## Production-Checked Items
 
@@ -43,6 +46,8 @@ The following items have been checked on the production site:
 - Email sending
 - PDF download from a direct Media Library URL
 - Submission log saving and admin display
+- Newsletter opt-in checkbox
+- Opt-in status in admin logs and CSV export
 
 ## Major Features
 
@@ -63,6 +68,10 @@ The following items have been checked on the production site:
   - lang
   - result
   - ip_address
+  - newsletter_optin
+- Newsletter opt-in values:
+  - `yes`
+  - `no`
 
 ## Zip Creation Procedure
 
@@ -103,6 +112,7 @@ Before creating the zip, check that no development-only files or secrets are inc
 - If email delivery is unreliable, configure authenticated SMTP.
 - Ask users to check spam, junk, and promotions folders if emails are not visible.
 - Submission logs are stored in WordPress options and capped at 200 entries.
+- Newsletter opt-in status should be handled carefully when exporting or using log data.
 
 ## Possible Future Additions
 
@@ -130,6 +140,8 @@ Current confirmed state:
 - Email sending works.
 - PDF download works when using directly accessible Media Library URLs.
 - Submission logging works.
+- Newsletter opt-in tracking works.
+- Opt-in status appears in logs and CSV export.
 
 Important constraints:
 

@@ -78,6 +78,8 @@ Main features that can be explained in future product material:
 - CSV export for logs.
 - Log clearing.
 - From Name and From Email settings.
+- Optional newsletter opt-in checkbox.
+- Opt-in status tracking in logs and CSV.
 
 Avoid overpromising email delivery. Email arrival depends on hosting, DNS, SMTP, and recipient mailbox settings.
 
@@ -109,6 +111,9 @@ Possible disclaimer points:
 - A production backup should be taken before installation or update.
 - SMTP setup may be required depending on the customer's hosting environment.
 - The plugin does not replace a dedicated email marketing service.
+- Future promotional or newsletter emails should be sent only to users who opted in.
+- Email address and opt-in CSV data must be handled carefully.
+- Compliance requirements depend on the operator's region and use case.
 - The plugin stores settings in WordPress options, not a dedicated custom database table.
 
 These notes should be refined before public sale or client delivery.

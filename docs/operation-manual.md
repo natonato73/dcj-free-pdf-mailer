@@ -86,6 +86,8 @@ Paste it into:
 - A custom HTML block
 - Any area where WordPress shortcodes are supported
 
+The frontend form also includes an optional newsletter opt-in checkbox. Users can receive the free PDF even if they do not check this box. If checked, the submission is recorded as opted in.
+
 ## 7. Email Body Replacement Tags
 
 The email body can use replacement tags.
@@ -157,10 +159,19 @@ Columns:
 - **言語**: Language value saved in the PDF setting.
 - **結果**: `success` or `failed`.
 - **IPアドレス**: Visitor IP address if available.
+- **お知らせ同意**: Whether the user checked the optional newsletter opt-in box.
 
 The admin screen displays the latest 50 logs. The plugin keeps up to 200 logs.
 
-## 12. Troubleshooting
+Opt-in status is also included in CSV exports. Use this status carefully if sending future updates, product news, or marketing communications.
+
+## 12. CSV Export
+
+Click **送信ログをCSV出力** to download submission logs as a CSV file.
+
+The CSV includes email addresses and newsletter opt-in status. Treat exported files carefully, store them only where needed, and use opt-in status responsibly when planning future updates or promotional messages.
+
+## 13. Troubleshooting
 
 ### Email Does Not Arrive
 
@@ -174,6 +185,13 @@ The admin screen displays the latest 50 logs. The plugin keeps up to 200 logs.
 - Ask the recipient to check spam, junk, or promotions folders.
 - Review the sender address and server mail settings.
 - Consider SMTP configuration for better delivery.
+
+### Newsletter or Promotional Emails
+
+- The newsletter opt-in checkbox is optional.
+- Do not treat a PDF request by itself as consent for future promotional email.
+- Use only opted-in email addresses for future updates or marketing messages.
+- Handle exported CSV files carefully because they contain email addresses and opt-in status.
 
 ### PDF Link Shows Forbidden
 
@@ -198,7 +216,7 @@ The plugin prevents repeated submissions from the same email address for a short
 3. Save the setting.
 4. Test the shortcode form again.
 
-## 13. Production Operation Notes
+## 14. Production Operation Notes
 
 - Always open the PDF URL in a browser before publishing.
 - Send a test email after adding or editing a setting.
@@ -206,3 +224,4 @@ The plugin prevents repeated submissions from the same email address for a short
 - Delete unnecessary test settings after confirmation.
 - Keep management IDs stable after publishing shortcodes.
 - Keep backups before plugin updates.
+- Treat email addresses, submission logs, and CSV exports as sensitive operational data.

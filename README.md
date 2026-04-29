@@ -19,8 +19,10 @@ PDF settings are stored in WordPress options. The plugin does not create a custo
 - Switch default text between Japanese and English in the new item form.
 - Display a confirmation preview in the admin screen.
 - Send PDF download links by email.
+- Optional newsletter opt-in checkbox.
 - Prevent repeated submissions from the same email address for a short period.
 - Save recent submission logs and display them in the admin screen.
+- Newsletter opt-in status in submission logs and CSV export.
 
 ## Requirements
 
@@ -60,6 +62,8 @@ This plugin uses WordPress mail sending through `wp_mail()`. Delivery depends on
 
 If a recipient cannot find the email, they should check spam, junk, or promotions folders. For more reliable delivery, configure WordPress to send mail through an authenticated SMTP service.
 
+Newsletter opt-in is optional. Use opt-in status for future updates, product news, or marketing communications only when consent has been obtained, and handle exported email/log data carefully.
+
 ## Development Status
 
 Current status:
@@ -71,6 +75,7 @@ Current status:
 - Japanese/English default text switching is implemented.
 - Email sending is working.
 - Submission logging is implemented.
+- Newsletter opt-in tracking is implemented.
 
 This plugin is still project-specific and should be reviewed before reuse on unrelated sites.
 
