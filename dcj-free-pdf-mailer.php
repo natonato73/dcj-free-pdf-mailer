@@ -717,9 +717,14 @@ class DCJ_Free_PDF_Mailer {
 			return;
 		}
 
+		$pdf_items        = $this->get_pdf_items();
+		$existing_pdf_ids = is_array( $pdf_items ) ? array_keys( $pdf_items ) : array();
+
 		?>
 		<script>
 		(function() {
+			var existingPdfIds = <?php echo wp_json_encode( $existing_pdf_ids ); ?>;
+
 			document.addEventListener('click', function(event) {
 				var button = event.target.closest('.dcj-fpm-media-select-button');
 
@@ -755,6 +760,57 @@ class DCJ_Free_PDF_Mailer {
 
 				frame.open();
 			});
+
+			document.addEventListener('click', function(event) {
+				var button = event.target.closest('.dcj-fpm-generate-id-button');
+				var idField;
+				var langSelect;
+				var lang;
+				var nextId;
+
+				if (!button) {
+					return;
+				}
+
+				event.preventDefault();
+
+				idField = document.getElementById('dcj_pdf_id');
+				langSelect = document.getElementById('dcj_lang');
+				lang = langSelect ? langSelect.value : 'ja';
+
+				if (!idField) {
+					return;
+				}
+
+				nextId = generatePdfId(lang);
+
+				if (idField.value && !window.confirm('現在の管理IDをID候補で上書きしますか？')) {
+					return;
+				}
+
+				idField.value = nextId;
+			});
+
+			function generatePdfId(lang) {
+				var maxNumber = 0;
+
+				existingPdfIds.forEach(function(pdfId) {
+					var match = String(pdfId).match(/^dcj-(\d+)(?:-(?:ja|en))?$/);
+					var number;
+
+					if (!match) {
+						return;
+					}
+
+					number = parseInt(match[1], 10);
+
+					if (number > maxNumber) {
+						maxNumber = number;
+					}
+				});
+
+				return 'dcj-' + String(maxNumber + 1).padStart(3, '0') + '-' + lang;
+			}
 
 			var defaults = {
 				ja: {
@@ -1348,7 +1404,10 @@ class DCJ_Free_PDF_Mailer {
 			<table class="form-table">
 				<tr>
 					<th scope="row"><label for="dcj_pdf_id"><?php echo esc_html( '管理ID' ); ?> *</label></th>
-					<td><input type="text" id="dcj_pdf_id" name="dcj_pdf_id" value="" placeholder="<?php echo esc_attr( ! empty( $duplicate_source_id ) ? '複製元: ' . $duplicate_source_id : 'sample-free-pdf-ja' ); ?>" required /></td>
+					<td>
+						<input type="text" id="dcj_pdf_id" name="dcj_pdf_id" value="" placeholder="<?php echo esc_attr( ! empty( $duplicate_source_id ) ? '複製元: ' . $duplicate_source_id : 'sample-free-pdf-ja' ); ?>" required />
+						<button type="button" class="button dcj-fpm-generate-id-button"><?php echo esc_html( 'ID候補を生成' ); ?></button>
+					</td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="dcj_lang"><?php echo esc_html( '言語' ); ?></label></th>
