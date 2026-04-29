@@ -35,6 +35,7 @@ class DCJ_Free_PDF_Mailer {
 	const DUPLICATE_CHECK_EXPIRE = 300; // 5分（秒）
 	const OPTION_PDF_ITEMS       = 'dcj_fpm_pdf_items';
 	const OPTION_SUBMISSION_LOGS = 'dcj_fpm_submission_logs';
+	const OPTION_SUBSCRIBERS     = 'dcj_fpm_subscribers';
 	const OPTION_MAIL_SETTINGS   = 'dcj_fpm_mail_settings';
 
 	/**
@@ -62,6 +63,7 @@ class DCJ_Free_PDF_Mailer {
 		add_action( 'admin_menu', array( $this, 'register_admin_menu' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_export_logs' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_export_optin_subscribers' ) );
+		add_action( 'admin_init', array( $this, 'handle_admin_export_subscribers' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_clear_logs' ) );
 
 		// 管理画面のメディアライブラリ選択
@@ -373,6 +375,9 @@ class DCJ_Free_PDF_Mailer {
 
 		$sent = wp_mail( $email, $subject, $body, $headers );
 		$this->save_submission_log( $email, $pdf_id, ! empty( $pdf_item['lang'] ) ? $pdf_item['lang'] : '', $sent ? 'success' : 'failed', $newsletter_optin );
+		if ( 'yes' === $newsletter_optin ) {
+			$this->save_subscriber( $email, $pdf_id, $pdf_item );
+		}
 
 		if ( $sent ) {
 			// 送信成功後、重複送信防止フラグを5分間保存
@@ -423,6 +428,47 @@ class DCJ_Free_PDF_Mailer {
 	}
 
 	/**
+	 * お知らせ受信に同意した購読者を保存します。
+	 *
+	 * @param string $email メールアドレス
+	 * @param string $pdf_id PDF識別ID
+	 * @param array  $pdf_item PDF設定
+	 */
+	private function save_subscriber( $email, $pdf_id, $pdf_item ) {
+
+		$email       = strtolower( sanitize_email( $email ) );
+		$subscribers = get_option( self::OPTION_SUBSCRIBERS, array() );
+		$subscribers = is_array( $subscribers ) ? $subscribers : array();
+
+		if ( empty( $email ) ) {
+			return;
+		}
+
+		$now = current_time( 'mysql' );
+
+		if ( ! isset( $subscribers[ $email ] ) || ! is_array( $subscribers[ $email ] ) ) {
+			$subscribers[ $email ] = array(
+				'email'              => $email,
+				'lang'               => '',
+				'source_pdf_id'      => '',
+				'source_title'       => '',
+				'optin_datetime'     => $now,
+				'last_seen_datetime' => '',
+				'status'             => 'subscribed',
+			);
+		}
+
+		$subscribers[ $email ]['email']              = $email;
+		$subscribers[ $email ]['lang']               = ! empty( $pdf_item['lang'] ) ? sanitize_key( $pdf_item['lang'] ) : '';
+		$subscribers[ $email ]['source_pdf_id']      = sanitize_key( $pdf_id );
+		$subscribers[ $email ]['source_title']       = ! empty( $pdf_item['title'] ) ? sanitize_text_field( $pdf_item['title'] ) : '';
+		$subscribers[ $email ]['last_seen_datetime'] = $now;
+		$subscribers[ $email ]['status']             = 'subscribed';
+
+		update_option( self::OPTION_SUBSCRIBERS, $subscribers );
+	}
+
+	/**
 	 * フォーム送信ログを取得します。
 	 *
 	 * @param int $limit 取得件数
@@ -437,6 +483,38 @@ class DCJ_Free_PDF_Mailer {
 		}
 
 		return array_slice( $logs, 0, absint( $limit ) );
+	}
+
+	/**
+	 * 購読者リストを取得します。
+	 *
+	 * @param int $limit 取得件数。0の場合は全件
+	 * @return array
+	 */
+	private function get_subscribers( $limit = 50 ) {
+
+		$subscribers = get_option( self::OPTION_SUBSCRIBERS, array() );
+
+		if ( ! is_array( $subscribers ) ) {
+			return array();
+		}
+
+		$subscribers = array_values( $subscribers );
+		usort(
+			$subscribers,
+			function ( $a, $b ) {
+				$a_datetime = ! empty( $a['last_seen_datetime'] ) ? $a['last_seen_datetime'] : '';
+				$b_datetime = ! empty( $b['last_seen_datetime'] ) ? $b['last_seen_datetime'] : '';
+
+				return strcmp( $b_datetime, $a_datetime );
+			}
+		);
+
+		if ( empty( $limit ) ) {
+			return $subscribers;
+		}
+
+		return array_slice( $subscribers, 0, absint( $limit ) );
 	}
 
 	/**
@@ -1126,6 +1204,7 @@ class DCJ_Free_PDF_Mailer {
 			</div>
 
 			<?php $this->render_submission_logs(); ?>
+			<?php $this->render_subscribers(); ?>
 		</div>
 		<?php
 	}
@@ -1517,6 +1596,67 @@ class DCJ_Free_PDF_Mailer {
 	}
 
 	/**
+	 * 購読者リストをCSV出力します。
+	 */
+	public function handle_admin_export_subscribers() {
+
+		if ( empty( $_GET['page'] ) || self::PLUGIN_SLUG !== sanitize_key( wp_unslash( $_GET['page'] ) ) ) {
+			return;
+		}
+
+		if ( empty( $_GET['dcj_fpm_action'] ) || 'export_subscribers' !== sanitize_key( wp_unslash( $_GET['dcj_fpm_action'] ) ) ) {
+			return;
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'dcj-free-pdf-mailer' ) );
+		}
+
+		if ( empty( $_GET['dcj_fpm_export_subscribers_nonce'] ) ) {
+			wp_die( esc_html( 'CSV出力の確認に失敗しました。' ) );
+		}
+
+		$nonce = sanitize_text_field( wp_unslash( $_GET['dcj_fpm_export_subscribers_nonce'] ) );
+		if ( ! wp_verify_nonce( $nonce, 'dcj_fpm_export_subscribers' ) ) {
+			wp_die( esc_html( 'CSV出力の確認に失敗しました。' ) );
+		}
+
+		$subscribers = $this->get_subscribers( 0 );
+		$timestamp   = date_i18n( 'Ymd-His', current_time( 'timestamp' ) );
+		$filename    = 'dcj-free-pdf-subscribers-' . $timestamp . '.csv';
+
+		nocache_headers();
+		header( 'Content-Type: text/csv; charset=UTF-8' );
+		header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
+
+		$output = fopen( 'php://output', 'w' );
+
+		if ( false !== $output ) {
+			fwrite( $output, "\xEF\xBB\xBF" );
+			fputcsv( $output, array( 'メールアドレス', '言語', '登録元PDF ID', '登録元タイトル', '初回同意日時', '最終同意日時', '状態' ) );
+
+			foreach ( $subscribers as $subscriber ) {
+				fputcsv(
+					$output,
+					array(
+						! empty( $subscriber['email'] ) ? $subscriber['email'] : '',
+						! empty( $subscriber['lang'] ) ? $subscriber['lang'] : '',
+						! empty( $subscriber['source_pdf_id'] ) ? $subscriber['source_pdf_id'] : '',
+						! empty( $subscriber['source_title'] ) ? $subscriber['source_title'] : '',
+						! empty( $subscriber['optin_datetime'] ) ? $subscriber['optin_datetime'] : '',
+						! empty( $subscriber['last_seen_datetime'] ) ? $subscriber['last_seen_datetime'] : '',
+						! empty( $subscriber['status'] ) ? $subscriber['status'] : '',
+					)
+				);
+			}
+
+			fclose( $output );
+		}
+
+		exit;
+	}
+
+	/**
 	 * 送信ログを全削除します。
 	 */
 	public function handle_admin_clear_logs() {
@@ -1635,6 +1775,62 @@ class DCJ_Free_PDF_Mailer {
 							<td><?php echo esc_html( ! empty( $log['result'] ) ? $log['result'] : '' ); ?></td>
 							<td><?php echo esc_html( ! empty( $log['ip_address'] ) ? $log['ip_address'] : '' ); ?></td>
 							<td><?php echo esc_html( $newsletter_optin_label ); ?></td>
+						</tr>
+					<?php endforeach; ?>
+				</tbody>
+			</table>
+		<?php endif; ?>
+		<?php
+	}
+
+	/**
+	 * 管理画面に購読者リストを表示します。
+	 */
+	private function render_subscribers() {
+
+		$subscribers = $this->get_subscribers( 50 );
+		$export_url  = wp_nonce_url(
+			add_query_arg(
+				array(
+					'page'           => self::PLUGIN_SLUG,
+					'dcj_fpm_action' => 'export_subscribers',
+				),
+				admin_url( 'admin.php' )
+			),
+			'dcj_fpm_export_subscribers',
+			'dcj_fpm_export_subscribers_nonce'
+		);
+
+		?>
+		<h2><?php echo esc_html( '購読者リスト' ); ?></h2>
+		<p>
+			<a class="button" href="<?php echo esc_url( $export_url ); ?>"><?php echo esc_html( '購読者リストをCSV出力' ); ?></a>
+		</p>
+		<?php if ( empty( $subscribers ) ) : ?>
+			<p><?php echo esc_html( 'まだ購読者はありません。' ); ?></p>
+		<?php else : ?>
+			<table class="widefat striped">
+				<thead>
+					<tr>
+						<th><?php echo esc_html( 'メールアドレス' ); ?></th>
+						<th><?php echo esc_html( '言語' ); ?></th>
+						<th><?php echo esc_html( '登録元PDF ID' ); ?></th>
+						<th><?php echo esc_html( '登録元タイトル' ); ?></th>
+						<th><?php echo esc_html( '初回同意日時' ); ?></th>
+						<th><?php echo esc_html( '最終同意日時' ); ?></th>
+						<th><?php echo esc_html( '状態' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+					<?php foreach ( $subscribers as $subscriber ) : ?>
+						<tr>
+							<td><?php echo esc_html( ! empty( $subscriber['email'] ) ? $subscriber['email'] : '' ); ?></td>
+							<td><?php echo esc_html( ! empty( $subscriber['lang'] ) ? $subscriber['lang'] : '' ); ?></td>
+							<td><?php echo esc_html( ! empty( $subscriber['source_pdf_id'] ) ? $subscriber['source_pdf_id'] : '' ); ?></td>
+							<td><?php echo esc_html( ! empty( $subscriber['source_title'] ) ? $subscriber['source_title'] : '' ); ?></td>
+							<td><?php echo esc_html( ! empty( $subscriber['optin_datetime'] ) ? $subscriber['optin_datetime'] : '' ); ?></td>
+							<td><?php echo esc_html( ! empty( $subscriber['last_seen_datetime'] ) ? $subscriber['last_seen_datetime'] : '' ); ?></td>
+							<td><?php echo esc_html( ! empty( $subscriber['status'] ) ? $subscriber['status'] : '' ); ?></td>
 						</tr>
 					<?php endforeach; ?>
 				</tbody>
