@@ -80,6 +80,10 @@ Main features that can be explained in future product material:
 - From Name and From Email settings.
 - Optional newsletter opt-in checkbox.
 - Opt-in status tracking in logs and CSV.
+- Subscriber list management.
+- Subscriber CSV export.
+- Subscriber status management.
+- Subscribed / unsubscribed status switching.
 
 Avoid overpromising email delivery. Email arrival depends on hosting, DNS, SMTP, and recipient mailbox settings.
 
@@ -112,8 +116,10 @@ Possible disclaimer points:
 - SMTP setup may be required depending on the customer's hosting environment.
 - The plugin does not replace a dedicated email marketing service.
 - Future promotional or newsletter emails should be sent only to users who opted in.
+- Operators should send newsletters or promotional emails only to active subscribed contacts.
+- Unsubscribed contacts should be excluded from future promotional email use.
 - Email address and opt-in CSV data must be handled carefully.
-- Compliance requirements depend on the operator's region and use case.
+- Compliance requirements depend on the operator's region, use case, and email service.
 - The plugin stores settings in WordPress options, not a dedicated custom database table.
 
 These notes should be refined before public sale or client delivery.

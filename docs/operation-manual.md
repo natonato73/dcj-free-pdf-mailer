@@ -173,7 +173,32 @@ Click **送信ログをCSV出力** to download submission logs as a CSV file.
 
 The CSV includes email addresses and newsletter opt-in status. Treat exported files carefully, store them only where needed, and use opt-in status responsibly when planning future updates or promotional messages.
 
-## 13. Troubleshooting
+## 13. Subscriber List
+
+The **購読者リスト** section is separate from submission logs. Only users who checked the newsletter opt-in box are added to this list.
+
+Saved subscriber fields:
+
+- Email address
+- Language
+- Source PDF ID
+- Source title
+- Initial opt-in datetime
+- Last seen datetime
+- Status
+
+If the same email address opts in again, the existing subscriber record is updated instead of duplicated. The initial opt-in datetime is kept, and the last seen datetime is updated.
+
+Subscriber status can be either:
+
+- `subscribed`: shown as **購読中**
+- `unsubscribed`: shown as **配信停止**
+
+Admins can use **配信停止にする** to mark a subscriber as unsubscribed, or **購読中に戻す** to mark the subscriber as subscribed again. If an unsubscribed user submits the free PDF form again with newsletter opt-in checked, the status is set back to subscribed.
+
+Click **購読者リストをCSV出力** to export the subscriber list as a CSV file. Use only subscribed contacts for future newsletters, coupons, or promotional emails. Do not send promotional emails to unsubscribed contacts.
+
+## 14. Troubleshooting
 
 ### Email Does Not Arrive
 
@@ -192,8 +217,9 @@ The CSV includes email addresses and newsletter opt-in status. Treat exported fi
 
 - The newsletter opt-in checkbox is optional.
 - Do not treat a PDF request by itself as consent for future promotional email.
-- Use only opted-in email addresses for future updates or marketing messages.
-- Handle exported CSV files carefully because they contain email addresses and opt-in status.
+- Use only subscribed email addresses for future updates or marketing messages.
+- Do not send promotional emails to unsubscribed contacts.
+- Handle exported CSV files carefully because they contain email addresses, opt-in status, and subscriber status.
 
 ### PDF Link Shows Forbidden
 
@@ -218,7 +244,7 @@ The plugin prevents repeated submissions from the same email address for a short
 3. Save the setting.
 4. Test the shortcode form again.
 
-## 14. Production Operation Notes
+## 15. Production Operation Notes
 
 - Always open the PDF URL in a browser before publishing.
 - Send a test email after adding or editing a setting.
@@ -227,3 +253,4 @@ The plugin prevents repeated submissions from the same email address for a short
 - Keep management IDs stable after publishing shortcodes.
 - Keep backups before plugin updates.
 - Treat email addresses, submission logs, and CSV exports as sensitive operational data.
+- Treat subscriber CSV exports carefully and exclude unsubscribed contacts from future promotional email use.

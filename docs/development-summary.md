@@ -5,7 +5,7 @@
 - Local development: LocalWP
 - Runtime target: WordPress plugin
 - Main plugin file: `dcj-free-pdf-mailer.php`
-- Repository latest confirmed commit: `a24d8a1 feat: add newsletter opt-in tracking`
+- Repository latest confirmed commit: `9fe90e6 feat: add subscriber status management`
 
 Do not store production admin URLs, email addresses, passwords, API keys, database credentials, or other secrets in this repository.
 
@@ -14,6 +14,7 @@ Do not store production admin URLs, email addresses, passwords, API keys, databa
 - Plugin directory: `dcj-free-pdf-mailer`
 - Main option for PDF settings: `dcj_fpm_pdf_items`
 - Main option for submission logs: `dcj_fpm_submission_logs`
+- Main option for subscribers: `dcj_fpm_subscribers`
 - Main shortcode: `[dcj_free_pdf id="..."]`
 
 ## Current Capabilities
@@ -31,6 +32,10 @@ Do not store production admin URLs, email addresses, passwords, API keys, databa
 - Save `newsletter_optin` in submission logs.
 - Display recent submission logs in the admin screen.
 - Include opt-in status in admin logs and CSV export.
+- Manage opted-in email addresses in a separate subscriber list.
+- Export the subscriber list as CSV.
+- Manage subscriber status as `subscribed` or `unsubscribed`.
+- Toggle subscriber status from the admin screen.
 
 ## Production-Checked Items
 
@@ -48,6 +53,9 @@ The following items have been checked on the production site:
 - Submission log saving and admin display
 - Newsletter opt-in checkbox
 - Opt-in status in admin logs and CSV export
+- Subscriber list management
+- Subscriber CSV export
+- Subscriber status management
 
 ## Major Features
 
@@ -72,6 +80,21 @@ The following items have been checked on the production site:
 - Newsletter opt-in values:
   - `yes`
   - `no`
+- Subscriber option name: `dcj_fpm_subscribers`
+- Subscriber fields:
+  - email
+  - lang
+  - source_pdf_id
+  - source_title
+  - optin_datetime
+  - last_seen_datetime
+  - status
+- Subscriber status values:
+  - `subscribed`
+  - `unsubscribed`
+- Admin subscriber actions:
+  - Mark as unsubscribed
+  - Mark as subscribed
 
 ## Zip Creation Procedure
 
@@ -113,10 +136,13 @@ Before creating the zip, check that no development-only files or secrets are inc
 - Ask users to check spam, junk, and promotions folders if emails are not visible.
 - Submission logs are stored in WordPress options and capped at 200 entries.
 - Newsletter opt-in status should be handled carefully when exporting or using log data.
+- Subscriber data is stored in WordPress options and should be handled carefully.
+- Future newsletter or promotional email use should exclude unsubscribed contacts.
 
 ## Possible Future Additions
 
 - CSV export for submission logs.
+- Subscriber list CSV export.
 - Log search and filters.
 - Manual log deletion or retention controls.
 - Dedicated database table for higher-volume logging.
@@ -142,6 +168,9 @@ Current confirmed state:
 - Submission logging works.
 - Newsletter opt-in tracking works.
 - Opt-in status appears in logs and CSV export.
+- Subscriber list management works.
+- Subscriber CSV export works.
+- Subscriber status management works.
 
 Important constraints:
 

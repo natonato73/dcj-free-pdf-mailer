@@ -23,6 +23,10 @@ PDF settings are stored in WordPress options. The plugin does not create a custo
 - Prevent repeated submissions from the same email address for a short period.
 - Save recent submission logs and display them in the admin screen.
 - Newsletter opt-in status in submission logs and CSV export.
+- Subscriber list management.
+- Subscriber CSV export.
+- Subscriber status management.
+- Mark subscribers as subscribed or unsubscribed.
 
 ## Requirements
 
@@ -64,6 +68,8 @@ If a recipient cannot find the email, they should check spam, junk, or promotion
 
 Newsletter opt-in is optional. Use opt-in status for future updates, product news, or marketing communications only when consent has been obtained, and handle exported email/log data carefully.
 
+Use only active subscribed contacts for future newsletters or promotional emails. Do not send promotional emails to unsubscribed contacts.
+
 ## Development Status
 
 Current status:
@@ -76,6 +82,8 @@ Current status:
 - Email sending is working.
 - Submission logging is implemented.
 - Newsletter opt-in tracking is implemented.
+- Subscriber list management is implemented.
+- Subscriber status management is implemented.
 
 This plugin is still project-specific and should be reviewed before reuse on unrelated sites.
 
