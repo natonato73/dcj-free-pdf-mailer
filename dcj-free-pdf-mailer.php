@@ -816,7 +816,7 @@ class DCJ_Free_PDF_Mailer {
 
 			var langSelect = document.getElementById('dcj_lang');
 
-			if (langSelect) {
+			if (langSelect && (!langSelect.form || langSelect.form.getAttribute('data-dcj-fpm-duplicate') !== '1')) {
 				langSelect.addEventListener('change', function() {
 					updateAddFormDefaults(langSelect.value);
 				});
@@ -906,6 +906,18 @@ class DCJ_Free_PDF_Mailer {
 							'dcj_fpm_edit_pdf_item_' . $pdf_id,
 							'dcj_fpm_edit_pdf_item_nonce'
 						);
+						$duplicate_url  = wp_nonce_url(
+							add_query_arg(
+								array(
+									'page'           => self::PLUGIN_SLUG,
+									'dcj_fpm_action' => 'duplicate',
+									'dcj_pdf_id'     => rawurlencode( $pdf_id ),
+								),
+								admin_url( 'admin.php' )
+							),
+							'dcj_fpm_duplicate_pdf_item_' . $pdf_id,
+							'dcj_fpm_duplicate_pdf_item_nonce'
+						);
 						$delete_url     = wp_nonce_url(
 							add_query_arg(
 								array(
@@ -928,6 +940,8 @@ class DCJ_Free_PDF_Mailer {
 							<td><?php echo esc_html( $enabled ); ?></td>
 							<td>
 								<a href="<?php echo esc_url( $edit_url ); ?>"><?php echo esc_html( '編集' ); ?></a>
+								|
+								<a href="<?php echo esc_url( $duplicate_url ); ?>"><?php echo esc_html( '複製' ); ?></a>
 								|
 								<a href="<?php echo esc_url( $delete_url ); ?>" onclick="return confirm('<?php echo esc_attr( 'このPDF設定を削除します。よろしいですか？' ); ?>');"><?php echo esc_html( '削除' ); ?></a>
 							</td>
@@ -1239,22 +1253,109 @@ class DCJ_Free_PDF_Mailer {
 
 		$nonce = wp_create_nonce( 'dcj_fpm_add_pdf_item' );
 		$default_mail_body = "こんにちは。\n\n{{title}} にお申し込みいただき、ありがとうございます。\n\n以下のリンクからPDFをダウンロードできます。\n\n{{pdf_url}}\n\n利用条件：\n{{terms_text}}\n\n塗り絵の時間を楽しんでいただければ嬉しいです。\n\nDream Coloring Journey";
+		$duplicate_source_id = '';
+		$duplicate_error     = '';
+		$add_values          = array(
+			'lang'              => 'ja',
+			'type'              => 'set',
+			'category'          => 'book_image',
+			'audience'          => 'preschool',
+			'audience_label'    => '幼児向け・3〜6歳',
+			'volume_label'      => 'PDF 5枚セット',
+			'delivery_method'   => 'email',
+			'migration_status'  => 'pending',
+			'title'             => 'サンプル塗り絵 無料PDF',
+			'description'       => 'メールアドレスを入力すると、無料PDFのご案内をお送りします。',
+			'thumbnail_url'     => '',
+			'pdf_url'           => '',
+			'mail_subject'      => '【Dream Coloring Journey】無料PDFダウンロードリンクのご案内',
+			'mail_body'         => $default_mail_body,
+			'button_text'       => '送信する',
+			'label_text'        => 'メールアドレス',
+			'note_text'         => 'ご入力いただいたメールアドレスは、無料PDFのご案内に使用します。',
+			'success_message'   => '無料PDFのご案内メールを送信しました。メールボックスをご確認ください。メールが見つからない場合は、迷惑メールフォルダやプロモーションフォルダもご確認ください。',
+			'duplicate_message' => 'すでにお申し込み済みです。メールボックスをご確認ください。',
+			'disabled_message'  => 'この無料PDFは現在配布を停止しています。',
+			'terms_type'        => 'personal_use_only',
+			'terms_text'        => '家庭内での個人利用に限ります。再配布・二次配布・商用利用は禁止です。',
+			'source_page_url'   => '',
+			'kdp_asin'          => '',
+			'kdp_title'         => '',
+			'kdp_url'           => '',
+			'admin_note'        => '管理用メモ。公開フォームには表示されません。',
+			'enabled'           => true,
+		);
+
+		if ( ! empty( $_GET['dcj_fpm_action'] ) && 'duplicate' === sanitize_key( wp_unslash( $_GET['dcj_fpm_action'] ) ) ) {
+			$duplicate_source_id = ! empty( $_GET['dcj_pdf_id'] ) ? sanitize_key( wp_unslash( $_GET['dcj_pdf_id'] ) ) : '';
+			$duplicate_nonce     = ! empty( $_GET['dcj_fpm_duplicate_pdf_item_nonce'] ) ? sanitize_text_field( wp_unslash( $_GET['dcj_fpm_duplicate_pdf_item_nonce'] ) ) : '';
+
+			if ( empty( $duplicate_source_id ) || empty( $duplicate_nonce ) || ! wp_verify_nonce( $duplicate_nonce, 'dcj_fpm_duplicate_pdf_item_' . $duplicate_source_id ) ) {
+				$duplicate_error     = '複製リクエストの確認に失敗しました。通常の新規追加フォームを表示しています。';
+				$duplicate_source_id = '';
+			} else {
+				$pdf_items = $this->get_pdf_items();
+
+				if ( empty( $pdf_items[ $duplicate_source_id ] ) || ! is_array( $pdf_items[ $duplicate_source_id ] ) ) {
+					$duplicate_error     = '複製元のPDF設定が見つかりませんでした。通常の新規追加フォームを表示しています。';
+					$duplicate_source_id = '';
+				} else {
+					$duplicate_fields = array(
+						'lang',
+						'type',
+						'category',
+						'audience',
+						'audience_label',
+						'volume_label',
+						'title',
+						'description',
+						'thumbnail_url',
+						'pdf_url',
+						'mail_subject',
+						'mail_body',
+						'button_text',
+						'label_text',
+						'note_text',
+						'success_message',
+						'duplicate_message',
+						'disabled_message',
+						'terms_type',
+						'terms_text',
+						'source_page_url',
+						'kdp_asin',
+						'kdp_title',
+						'kdp_url',
+						'admin_note',
+						'enabled',
+					);
+
+					foreach ( $duplicate_fields as $field_key ) {
+						if ( array_key_exists( $field_key, $pdf_items[ $duplicate_source_id ] ) ) {
+							$add_values[ $field_key ] = $pdf_items[ $duplicate_source_id ][ $field_key ];
+						}
+					}
+				}
+			}
+		}
 
 		?>
 		<h2><?php echo esc_html( '新規PDF設定を追加' ); ?></h2>
+		<?php if ( ! empty( $duplicate_error ) ) : ?>
+			<div class="notice notice-error inline"><p><?php echo esc_html( $duplicate_error ); ?></p></div>
+		<?php endif; ?>
 
-		<form method="post" action="">
+		<form method="post" action="" data-dcj-fpm-duplicate="<?php echo esc_attr( ! empty( $duplicate_source_id ) ? '1' : '0' ); ?>">
 			<table class="form-table">
 				<tr>
 					<th scope="row"><label for="dcj_pdf_id"><?php echo esc_html( '管理ID' ); ?> *</label></th>
-					<td><input type="text" id="dcj_pdf_id" name="dcj_pdf_id" value="" placeholder="<?php echo esc_attr( 'sample-free-pdf-ja' ); ?>" required /></td>
+					<td><input type="text" id="dcj_pdf_id" name="dcj_pdf_id" value="" placeholder="<?php echo esc_attr( ! empty( $duplicate_source_id ) ? '複製元: ' . $duplicate_source_id : 'sample-free-pdf-ja' ); ?>" required /></td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="dcj_lang"><?php echo esc_html( '言語' ); ?></label></th>
 					<td>
 						<select id="dcj_lang" name="dcj_lang">
-							<option value="ja"><?php echo esc_html( '日本語' ); ?></option>
-							<option value="en"><?php echo esc_html( '英語' ); ?></option>
+							<option value="ja" <?php selected( $add_values['lang'], 'ja' ); ?>><?php echo esc_html( '日本語' ); ?></option>
+							<option value="en" <?php selected( $add_values['lang'], 'en' ); ?>><?php echo esc_html( '英語' ); ?></option>
 						</select>
 					</td>
 				</tr>
@@ -1262,9 +1363,9 @@ class DCJ_Free_PDF_Mailer {
 					<th scope="row"><label for="dcj_type"><?php echo esc_html( '種類' ); ?></label></th>
 					<td>
 						<select id="dcj_type" name="dcj_type">
-							<option value="set"><?php echo esc_html( 'セット' ); ?></option>
-							<option value="single"><?php echo esc_html( '単品' ); ?></option>
-							<option value="bonus"><?php echo esc_html( '特典' ); ?></option>
+							<option value="set" <?php selected( $add_values['type'], 'set' ); ?>><?php echo esc_html( 'セット' ); ?></option>
+							<option value="single" <?php selected( $add_values['type'], 'single' ); ?>><?php echo esc_html( '単品' ); ?></option>
+							<option value="bonus" <?php selected( $add_values['type'], 'bonus' ); ?>><?php echo esc_html( '特典' ); ?></option>
 						</select>
 					</td>
 				</tr>
@@ -1273,7 +1374,7 @@ class DCJ_Free_PDF_Mailer {
 					<td>
 						<select id="dcj_category" name="dcj_category">
 							<?php foreach ( $this->get_category_options() as $category_value => $category_label ) : ?>
-								<option value="<?php echo esc_attr( $category_value ); ?>"><?php echo esc_html( $category_label ); ?></option>
+								<option value="<?php echo esc_attr( $category_value ); ?>" <?php selected( $add_values['category'], $category_value ); ?>><?php echo esc_html( $category_label ); ?></option>
 							<?php endforeach; ?>
 						</select>
 					</td>
@@ -1282,28 +1383,28 @@ class DCJ_Free_PDF_Mailer {
 					<th scope="row"><label for="dcj_audience"><?php echo esc_html( '対象' ); ?></label></th>
 					<td>
 						<select id="dcj_audience" name="dcj_audience">
-							<option value="preschool"><?php echo esc_html( '幼児向け' ); ?></option>
-							<option value="kids"><?php echo esc_html( '子ども向け' ); ?></option>
-							<option value="family"><?php echo esc_html( '親子向け' ); ?></option>
-							<option value="adults"><?php echo esc_html( '大人向け' ); ?></option>
+							<option value="preschool" <?php selected( $add_values['audience'], 'preschool' ); ?>><?php echo esc_html( '幼児向け' ); ?></option>
+							<option value="kids" <?php selected( $add_values['audience'], 'kids' ); ?>><?php echo esc_html( '子ども向け' ); ?></option>
+							<option value="family" <?php selected( $add_values['audience'], 'family' ); ?>><?php echo esc_html( '親子向け' ); ?></option>
+							<option value="adults" <?php selected( $add_values['audience'], 'adults' ); ?>><?php echo esc_html( '大人向け' ); ?></option>
 						</select>
 					</td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="dcj_audience_label"><?php echo esc_html( '対象ラベル' ); ?></label></th>
-					<td><input type="text" id="dcj_audience_label" name="dcj_audience_label" value="<?php echo esc_attr( '幼児向け・3〜6歳' ); ?>" /></td>
+					<td><input type="text" id="dcj_audience_label" name="dcj_audience_label" value="<?php echo esc_attr( $add_values['audience_label'] ); ?>" /></td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="dcj_volume_label"><?php echo esc_html( 'ボリュームラベル' ); ?></label></th>
-					<td><input type="text" id="dcj_volume_label" name="dcj_volume_label" value="<?php echo esc_attr( 'PDF 5枚セット' ); ?>" /></td>
+					<td><input type="text" id="dcj_volume_label" name="dcj_volume_label" value="<?php echo esc_attr( $add_values['volume_label'] ); ?>" /></td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="dcj_delivery_method"><?php echo esc_html( '配布方式' ); ?></label></th>
 					<td>
 						<select id="dcj_delivery_method" name="dcj_delivery_method">
-							<option value="email"><?php echo esc_html( 'メール' ); ?></option>
-							<option value="direct"><?php echo esc_html( 'ダイレクト' ); ?></option>
-							<option value="selection_form"><?php echo esc_html( '選択フォーム' ); ?></option>
+							<option value="email" <?php selected( $add_values['delivery_method'], 'email' ); ?>><?php echo esc_html( 'メール' ); ?></option>
+							<option value="direct" <?php selected( $add_values['delivery_method'], 'direct' ); ?>><?php echo esc_html( 'ダイレクト' ); ?></option>
+							<option value="selection_form" <?php selected( $add_values['delivery_method'], 'selection_form' ); ?>><?php echo esc_html( '選択フォーム' ); ?></option>
 						</select>
 					</td>
 				</tr>
@@ -1311,31 +1412,31 @@ class DCJ_Free_PDF_Mailer {
 					<th scope="row"><label for="dcj_migration_status"><?php echo esc_html( '移行ステータス' ); ?></label></th>
 					<td>
 						<select id="dcj_migration_status" name="dcj_migration_status">
-							<option value="pending"><?php echo esc_html( 'ペンディング' ); ?></option>
-							<option value="converted"><?php echo esc_html( '変換済み' ); ?></option>
-							<option value="keep_direct"><?php echo esc_html( 'ダイレクト維持' ); ?></option>
-							<option value="disabled"><?php echo esc_html( '無効' ); ?></option>
+							<option value="pending" <?php selected( $add_values['migration_status'], 'pending' ); ?>><?php echo esc_html( 'ペンディング' ); ?></option>
+							<option value="converted" <?php selected( $add_values['migration_status'], 'converted' ); ?>><?php echo esc_html( '変換済み' ); ?></option>
+							<option value="keep_direct" <?php selected( $add_values['migration_status'], 'keep_direct' ); ?>><?php echo esc_html( 'ダイレクト維持' ); ?></option>
+							<option value="disabled" <?php selected( $add_values['migration_status'], 'disabled' ); ?>><?php echo esc_html( '無効' ); ?></option>
 						</select>
 					</td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="dcj_title"><?php echo esc_html( 'タイトル' ); ?> *</label></th>
 					<td>
-						<input type="text" id="dcj_title" name="dcj_title" value="<?php echo esc_attr( 'サンプル塗り絵 無料PDF' ); ?>" required />
+						<input type="text" id="dcj_title" name="dcj_title" value="<?php echo esc_attr( $add_values['title'] ); ?>" required />
 						<p class="description"><?php echo esc_html( 'フォーム上部に表示される無料PDFのタイトルです。' ); ?></p>
 					</td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="dcj_description"><?php echo esc_html( '説明' ); ?></label></th>
 					<td>
-						<textarea id="dcj_description" name="dcj_description" rows="4" cols="50"><?php echo esc_textarea( 'メールアドレスを入力すると、無料PDFのご案内をお送りします。' ); ?></textarea>
+						<textarea id="dcj_description" name="dcj_description" rows="4" cols="50"><?php echo esc_textarea( $add_values['description'] ); ?></textarea>
 						<p class="description"><?php echo esc_html( 'フォーム内の説明文として表示されます。' ); ?></p>
 					</td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="dcj_thumbnail_url"><?php echo esc_html( 'サムネイルURL' ); ?></label></th>
 					<td>
-						<input type="url" id="dcj_thumbnail_url" name="dcj_thumbnail_url" value="" placeholder="<?php echo esc_attr( 'https://example.com/thumbnail.jpg' ); ?>" />
+						<input type="url" id="dcj_thumbnail_url" name="dcj_thumbnail_url" value="<?php echo esc_url( $add_values['thumbnail_url'] ); ?>" placeholder="<?php echo esc_attr( 'https://example.com/thumbnail.jpg' ); ?>" />
 						<button type="button" class="button dcj-fpm-media-select-button" data-target="#dcj_thumbnail_url"><?php echo esc_html( 'メディアから選択' ); ?></button>
 						<p class="description"><?php echo esc_html( '将来のカード表示や管理画面プレビュー用の画像URLです。現在のメール送信には使用しません。空欄でも問題ありません。' ); ?></p>
 					</td>
@@ -1343,7 +1444,7 @@ class DCJ_Free_PDF_Mailer {
 				<tr>
 					<th scope="row"><label for="dcj_pdf_url"><?php echo esc_html( 'PDF URL' ); ?> *</label></th>
 					<td>
-						<input type="url" id="dcj_pdf_url" name="dcj_pdf_url" value="" placeholder="<?php echo esc_attr( 'https://example.com/free-pdf.pdf' ); ?>" required />
+						<input type="url" id="dcj_pdf_url" name="dcj_pdf_url" value="<?php echo esc_url( $add_values['pdf_url'] ); ?>" placeholder="<?php echo esc_attr( 'https://example.com/free-pdf.pdf' ); ?>" required />
 						<button type="button" class="button dcj-fpm-media-select-button" data-target="#dcj_pdf_url"><?php echo esc_html( 'メディアから選択' ); ?></button>
 						<p class="description"><?php echo esc_html( '受信メール本文の {{pdf_url}} に入ります。必ずブラウザで直接開けるPDF URLを指定してください。/wp-content/uploads/dlm_uploads/ 配下など、直接アクセス禁止のURLは使用しないでください。' ); ?></p>
 					</td>
@@ -1351,56 +1452,56 @@ class DCJ_Free_PDF_Mailer {
 				<tr>
 					<th scope="row"><label for="dcj_mail_subject"><?php echo esc_html( 'メール件名' ); ?> *</label></th>
 					<td>
-						<input type="text" id="dcj_mail_subject" name="dcj_mail_subject" value="<?php echo esc_attr( '【Dream Coloring Journey】無料PDFダウンロードリンクのご案内' ); ?>" required />
+						<input type="text" id="dcj_mail_subject" name="dcj_mail_subject" value="<?php echo esc_attr( $add_values['mail_subject'] ); ?>" required />
 						<p class="description"><?php echo esc_html( '受信者に届くメールの件名です。' ); ?></p>
 					</td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="dcj_mail_body"><?php echo esc_html( 'メール本文' ); ?> *</label></th>
 					<td>
-						<textarea id="dcj_mail_body" name="dcj_mail_body" rows="8" cols="50" required><?php echo esc_textarea( $default_mail_body ); ?></textarea>
+						<textarea id="dcj_mail_body" name="dcj_mail_body" rows="8" cols="50" required><?php echo esc_textarea( $add_values['mail_body'] ); ?></textarea>
 						<p class="description"><?php echo esc_html( '受信者に届くメール本文です。{{title}}、{{pdf_url}}、{{terms_text}} などの置換タグが使えます。' ); ?></p>
 					</td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="dcj_button_text"><?php echo esc_html( 'ボタンテキスト' ); ?></label></th>
 					<td>
-						<input type="text" id="dcj_button_text" name="dcj_button_text" value="<?php echo esc_attr( '送信する' ); ?>" />
+						<input type="text" id="dcj_button_text" name="dcj_button_text" value="<?php echo esc_attr( $add_values['button_text'] ); ?>" />
 						<p class="description"><?php echo esc_html( 'フォームの送信ボタンに表示されます。空欄の場合は「送信する / Send」が使われます。' ); ?></p>
 					</td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="dcj_label_text"><?php echo esc_html( 'ラベルテキスト' ); ?></label></th>
 					<td>
-						<input type="text" id="dcj_label_text" name="dcj_label_text" value="<?php echo esc_attr( 'メールアドレス' ); ?>" />
+						<input type="text" id="dcj_label_text" name="dcj_label_text" value="<?php echo esc_attr( $add_values['label_text'] ); ?>" />
 						<p class="description"><?php echo esc_html( 'メールアドレス入力欄の上に表示されます。空欄の場合は「メールアドレス / Email address」が使われます。' ); ?></p>
 					</td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="dcj_note_text"><?php echo esc_html( '注記テキスト' ); ?></label></th>
 					<td>
-						<textarea id="dcj_note_text" name="dcj_note_text" rows="3" cols="50"><?php echo esc_textarea( 'ご入力いただいたメールアドレスは、無料PDFのご案内に使用します。' ); ?></textarea>
+						<textarea id="dcj_note_text" name="dcj_note_text" rows="3" cols="50"><?php echo esc_textarea( $add_values['note_text'] ); ?></textarea>
 						<p class="description"><?php echo esc_html( '送信ボタンの下に表示される補足文です。メールアドレスの利用目的などを記載します。' ); ?></p>
 					</td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="dcj_success_message"><?php echo esc_html( '成功メッセージ' ); ?></label></th>
 					<td>
-						<textarea id="dcj_success_message" name="dcj_success_message" rows="2" cols="50"><?php echo esc_textarea( '無料PDFのご案内メールを送信しました。メールボックスをご確認ください。メールが見つからない場合は、迷惑メールフォルダやプロモーションフォルダもご確認ください。' ); ?></textarea>
+						<textarea id="dcj_success_message" name="dcj_success_message" rows="2" cols="50"><?php echo esc_textarea( $add_values['success_message'] ); ?></textarea>
 						<p class="description"><?php echo esc_html( 'メール送信成功後、フォーム下に表示されます。' ); ?></p>
 					</td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="dcj_duplicate_message"><?php echo esc_html( '重複メッセージ' ); ?></label></th>
 					<td>
-						<textarea id="dcj_duplicate_message" name="dcj_duplicate_message" rows="2" cols="50"><?php echo esc_textarea( 'すでにお申し込み済みです。メールボックスをご確認ください。' ); ?></textarea>
+						<textarea id="dcj_duplicate_message" name="dcj_duplicate_message" rows="2" cols="50"><?php echo esc_textarea( $add_values['duplicate_message'] ); ?></textarea>
 						<p class="description"><?php echo esc_html( '同じメールアドレスで短時間に再送信した場合に表示されます。' ); ?></p>
 					</td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="dcj_disabled_message"><?php echo esc_html( '無効メッセージ' ); ?></label></th>
 					<td>
-						<textarea id="dcj_disabled_message" name="dcj_disabled_message" rows="2" cols="50"><?php echo esc_textarea( 'この無料PDFは現在配布を停止しています。' ); ?></textarea>
+						<textarea id="dcj_disabled_message" name="dcj_disabled_message" rows="2" cols="50"><?php echo esc_textarea( $add_values['disabled_message'] ); ?></textarea>
 						<p class="description"><?php echo esc_html( 'このPDF設定を無効にした場合に表示されます。' ); ?></p>
 					</td>
 				</tr>
@@ -1408,10 +1509,10 @@ class DCJ_Free_PDF_Mailer {
 					<th scope="row"><label for="dcj_terms_type"><?php echo esc_html( '利用規約タイプ' ); ?></label></th>
 					<td>
 						<select id="dcj_terms_type" name="dcj_terms_type">
-							<option value="personal_use_only"><?php echo esc_html( '個人利用のみ' ); ?></option>
-							<option value="classroom_ok"><?php echo esc_html( '教室利用可' ); ?></option>
-							<option value="none"><?php echo esc_html( 'なし' ); ?></option>
-							<option value="other"><?php echo esc_html( 'その他' ); ?></option>
+							<option value="personal_use_only" <?php selected( $add_values['terms_type'], 'personal_use_only' ); ?>><?php echo esc_html( '個人利用のみ' ); ?></option>
+							<option value="classroom_ok" <?php selected( $add_values['terms_type'], 'classroom_ok' ); ?>><?php echo esc_html( '教室利用可' ); ?></option>
+							<option value="none" <?php selected( $add_values['terms_type'], 'none' ); ?>><?php echo esc_html( 'なし' ); ?></option>
+							<option value="other" <?php selected( $add_values['terms_type'], 'other' ); ?>><?php echo esc_html( 'その他' ); ?></option>
 						</select>
 						<p class="description"><?php echo esc_html( '利用条件の分類です。管理用の区分として使います。' ); ?></p>
 					</td>
@@ -1419,20 +1520,20 @@ class DCJ_Free_PDF_Mailer {
 				<tr>
 					<th scope="row"><label for="dcj_terms_text"><?php echo esc_html( '利用規約テキスト' ); ?></label></th>
 					<td>
-						<textarea id="dcj_terms_text" name="dcj_terms_text" rows="3" cols="50"><?php echo esc_textarea( '家庭内での個人利用に限ります。再配布・二次配布・商用利用は禁止です。' ); ?></textarea>
+						<textarea id="dcj_terms_text" name="dcj_terms_text" rows="3" cols="50"><?php echo esc_textarea( $add_values['terms_text'] ); ?></textarea>
 						<p class="description"><?php echo esc_html( 'メール本文の {{terms_text}} に入ります。' ); ?></p>
 					</td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="dcj_admin_note"><?php echo esc_html( '管理メモ' ); ?></label></th>
 					<td>
-						<textarea id="dcj_admin_note" name="dcj_admin_note" rows="3" cols="50"><?php echo esc_textarea( '管理用メモ。公開フォームには表示されません。' ); ?></textarea>
+						<textarea id="dcj_admin_note" name="dcj_admin_note" rows="3" cols="50"><?php echo esc_textarea( $add_values['admin_note'] ); ?></textarea>
 						<p class="description"><?php echo esc_html( '管理画面一覧で目的確認用に表示されます。公開ページには表示されません。' ); ?></p>
 					</td>
 				</tr>
 				<tr>
 					<th scope="row"><label for="dcj_enabled"><?php echo esc_html( '有効' ); ?></label></th>
-					<td><input type="checkbox" id="dcj_enabled" name="dcj_enabled" value="1" checked /></td>
+					<td><input type="checkbox" id="dcj_enabled" name="dcj_enabled" value="1" <?php checked( ! empty( $add_values['enabled'] ) ); ?> /></td>
 				</tr>
 			</table>
 
@@ -1450,28 +1551,28 @@ class DCJ_Free_PDF_Mailer {
 					<tr>
 						<th scope="row"><label for="dcj_source_page_url"><?php echo esc_html( 'ソースページURL' ); ?></label></th>
 						<td>
-							<input type="url" id="dcj_source_page_url" name="dcj_source_page_url" value="" placeholder="<?php echo esc_attr( 'https://example.com/freebie-page/' ); ?>" />
+							<input type="url" id="dcj_source_page_url" name="dcj_source_page_url" value="<?php echo esc_url( $add_values['source_page_url'] ); ?>" placeholder="<?php echo esc_attr( 'https://example.com/freebie-page/' ); ?>" />
 							<p class="description"><?php echo esc_html( 'この無料PDFを設置・案内している元記事URLです。' ); ?></p>
 						</td>
 					</tr>
 					<tr>
 						<th scope="row"><label for="dcj_kdp_asin"><?php echo esc_html( 'KDP ASIN' ); ?></label></th>
 						<td>
-							<input type="text" id="dcj_kdp_asin" name="dcj_kdp_asin" value="" placeholder="<?php echo esc_attr( 'B0XXXXXXXX' ); ?>" />
+							<input type="text" id="dcj_kdp_asin" name="dcj_kdp_asin" value="<?php echo esc_attr( $add_values['kdp_asin'] ); ?>" placeholder="<?php echo esc_attr( 'B0XXXXXXXX' ); ?>" />
 							<p class="description"><?php echo esc_html( '関連するAmazon KDP商品のASINです。' ); ?></p>
 						</td>
 					</tr>
 					<tr>
 						<th scope="row"><label for="dcj_kdp_title"><?php echo esc_html( 'KDPタイトル' ); ?></label></th>
 						<td>
-							<input type="text" id="dcj_kdp_title" name="dcj_kdp_title" value="" placeholder="<?php echo esc_attr( '関連KDP商品のタイトル' ); ?>" />
+							<input type="text" id="dcj_kdp_title" name="dcj_kdp_title" value="<?php echo esc_attr( $add_values['kdp_title'] ); ?>" placeholder="<?php echo esc_attr( '関連KDP商品のタイトル' ); ?>" />
 							<p class="description"><?php echo esc_html( '関連するKDP書籍・シリーズ名の管理用メモです。' ); ?></p>
 						</td>
 					</tr>
 					<tr>
 						<th scope="row"><label for="dcj_kdp_url"><?php echo esc_html( 'KDP URL' ); ?></label></th>
 						<td>
-							<input type="url" id="dcj_kdp_url" name="dcj_kdp_url" value="" placeholder="<?php echo esc_attr( 'https://www.amazon.co.jp/dp/B0XXXXXXXX' ); ?>" />
+							<input type="url" id="dcj_kdp_url" name="dcj_kdp_url" value="<?php echo esc_url( $add_values['kdp_url'] ); ?>" placeholder="<?php echo esc_attr( 'https://www.amazon.co.jp/dp/B0XXXXXXXX' ); ?>" />
 							<p class="description"><?php echo esc_html( '関連するAmazon商品ページURLです。' ); ?></p>
 						</td>
 					</tr>
