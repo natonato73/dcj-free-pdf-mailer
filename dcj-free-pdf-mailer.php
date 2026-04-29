@@ -64,6 +64,7 @@ class DCJ_Free_PDF_Mailer {
 		add_action( 'admin_init', array( $this, 'handle_admin_export_logs' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_export_optin_subscribers' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_export_subscribers' ) );
+		add_action( 'admin_init', array( $this, 'handle_admin_update_subscriber_status' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_clear_logs' ) );
 
 		// 管理画面のメディアライブラリ選択
@@ -515,6 +516,21 @@ class DCJ_Free_PDF_Mailer {
 		}
 
 		return array_slice( $subscribers, 0, absint( $limit ) );
+	}
+
+	/**
+	 * 購読者ステータスの表示名を取得します。
+	 *
+	 * @param string $status 購読者ステータス
+	 * @return string
+	 */
+	private function get_subscriber_status_label( $status ) {
+
+		if ( 'unsubscribed' === $status ) {
+			return '配信停止';
+		}
+
+		return '購読中';
 	}
 
 	/**
@@ -1645,7 +1661,7 @@ class DCJ_Free_PDF_Mailer {
 						! empty( $subscriber['source_title'] ) ? $subscriber['source_title'] : '',
 						! empty( $subscriber['optin_datetime'] ) ? $subscriber['optin_datetime'] : '',
 						! empty( $subscriber['last_seen_datetime'] ) ? $subscriber['last_seen_datetime'] : '',
-						! empty( $subscriber['status'] ) ? $subscriber['status'] : '',
+						$this->get_subscriber_status_label( ! empty( $subscriber['status'] ) ? $subscriber['status'] : 'subscribed' ),
 					)
 				);
 			}
@@ -1653,6 +1669,70 @@ class DCJ_Free_PDF_Mailer {
 			fclose( $output );
 		}
 
+		exit;
+	}
+
+	/**
+	 * 購読者ステータスを更新します。
+	 */
+	public function handle_admin_update_subscriber_status() {
+
+		if ( empty( $_GET['page'] ) || self::PLUGIN_SLUG !== sanitize_key( wp_unslash( $_GET['page'] ) ) ) {
+			return;
+		}
+
+		if ( empty( $_GET['dcj_fpm_action'] ) || 'update_subscriber_status' !== sanitize_key( wp_unslash( $_GET['dcj_fpm_action'] ) ) ) {
+			return;
+		}
+
+		$redirect_url = add_query_arg(
+			array(
+				'page' => self::PLUGIN_SLUG,
+			),
+			admin_url( 'admin.php' )
+		);
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'dcj-free-pdf-mailer' ) );
+		}
+
+		$email  = ! empty( $_GET['subscriber_email'] ) ? strtolower( sanitize_email( wp_unslash( $_GET['subscriber_email'] ) ) ) : '';
+		$status = ! empty( $_GET['subscriber_status'] ) ? sanitize_key( wp_unslash( $_GET['subscriber_status'] ) ) : '';
+
+		if ( empty( $email ) || ! in_array( $status, array( 'subscribed', 'unsubscribed' ), true ) ) {
+			set_transient( 'dcj_fpm_admin_error', '購読者の状態を更新できませんでした。', 30 );
+			wp_safe_redirect( $redirect_url );
+			exit;
+		}
+
+		if ( empty( $_GET['dcj_fpm_subscriber_status_nonce'] ) ) {
+			set_transient( 'dcj_fpm_admin_error', '購読者状態更新の確認に失敗しました。', 30 );
+			wp_safe_redirect( $redirect_url );
+			exit;
+		}
+
+		$nonce = sanitize_text_field( wp_unslash( $_GET['dcj_fpm_subscriber_status_nonce'] ) );
+		if ( ! wp_verify_nonce( $nonce, 'dcj_fpm_update_subscriber_status_' . $email ) ) {
+			set_transient( 'dcj_fpm_admin_error', '購読者状態更新の確認に失敗しました。', 30 );
+			wp_safe_redirect( $redirect_url );
+			exit;
+		}
+
+		$subscribers = get_option( self::OPTION_SUBSCRIBERS, array() );
+		$subscribers = is_array( $subscribers ) ? $subscribers : array();
+
+		if ( empty( $subscribers[ $email ] ) || ! is_array( $subscribers[ $email ] ) ) {
+			set_transient( 'dcj_fpm_admin_error', '対象の購読者が見つかりません。', 30 );
+			wp_safe_redirect( $redirect_url );
+			exit;
+		}
+
+		$subscribers[ $email ]['status'] = $status;
+		update_option( self::OPTION_SUBSCRIBERS, $subscribers );
+
+		set_transient( 'dcj_fpm_admin_success', '購読者の状態を更新しました。', 30 );
+
+		wp_safe_redirect( $redirect_url );
 		exit;
 	}
 
@@ -1819,10 +1899,31 @@ class DCJ_Free_PDF_Mailer {
 						<th><?php echo esc_html( '初回同意日時' ); ?></th>
 						<th><?php echo esc_html( '最終同意日時' ); ?></th>
 						<th><?php echo esc_html( '状態' ); ?></th>
+						<th><?php echo esc_html( '操作' ); ?></th>
 					</tr>
 				</thead>
 				<tbody>
 					<?php foreach ( $subscribers as $subscriber ) : ?>
+						<?php
+						$subscriber_email  = ! empty( $subscriber['email'] ) ? strtolower( sanitize_email( $subscriber['email'] ) ) : '';
+						$subscriber_status = ! empty( $subscriber['status'] ) && 'unsubscribed' === $subscriber['status'] ? 'unsubscribed' : 'subscribed';
+						$next_status       = 'subscribed' === $subscriber_status ? 'unsubscribed' : 'subscribed';
+						$action_label      = 'subscribed' === $subscriber_status ? '配信停止にする' : '購読中に戻す';
+						$confirm_message   = 'subscribed' === $subscriber_status ? 'この購読者を配信停止にします。よろしいですか？' : 'この購読者を購読中に戻します。よろしいですか？';
+						$status_url        = wp_nonce_url(
+							add_query_arg(
+								array(
+									'page'              => self::PLUGIN_SLUG,
+									'dcj_fpm_action'    => 'update_subscriber_status',
+									'subscriber_email'  => $subscriber_email,
+									'subscriber_status' => $next_status,
+								),
+								admin_url( 'admin.php' )
+							),
+							'dcj_fpm_update_subscriber_status_' . $subscriber_email,
+							'dcj_fpm_subscriber_status_nonce'
+						);
+						?>
 						<tr>
 							<td><?php echo esc_html( ! empty( $subscriber['email'] ) ? $subscriber['email'] : '' ); ?></td>
 							<td><?php echo esc_html( ! empty( $subscriber['lang'] ) ? $subscriber['lang'] : '' ); ?></td>
@@ -1830,7 +1931,8 @@ class DCJ_Free_PDF_Mailer {
 							<td><?php echo esc_html( ! empty( $subscriber['source_title'] ) ? $subscriber['source_title'] : '' ); ?></td>
 							<td><?php echo esc_html( ! empty( $subscriber['optin_datetime'] ) ? $subscriber['optin_datetime'] : '' ); ?></td>
 							<td><?php echo esc_html( ! empty( $subscriber['last_seen_datetime'] ) ? $subscriber['last_seen_datetime'] : '' ); ?></td>
-							<td><?php echo esc_html( ! empty( $subscriber['status'] ) ? $subscriber['status'] : '' ); ?></td>
+							<td><?php echo esc_html( $this->get_subscriber_status_label( $subscriber_status ) ); ?></td>
+							<td><a href="<?php echo esc_url( $status_url ); ?>" onclick="return confirm('<?php echo esc_attr( $confirm_message ); ?>');"><?php echo esc_html( $action_label ); ?></a></td>
 						</tr>
 					<?php endforeach; ?>
 				</tbody>
