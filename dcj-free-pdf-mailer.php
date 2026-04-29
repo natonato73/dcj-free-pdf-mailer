@@ -60,6 +60,7 @@ class DCJ_Free_PDF_Mailer {
 		// 管理画面メニュー登録
 		add_action( 'admin_menu', array( $this, 'register_admin_menu' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_export_logs' ) );
+		add_action( 'admin_init', array( $this, 'handle_admin_clear_logs' ) );
 
 		// 管理画面のメディアライブラリ選択
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_media' ) );
@@ -1317,6 +1318,50 @@ class DCJ_Free_PDF_Mailer {
 	}
 
 	/**
+	 * 送信ログを全削除します。
+	 */
+	public function handle_admin_clear_logs() {
+
+		if ( empty( $_GET['page'] ) || self::PLUGIN_SLUG !== sanitize_key( wp_unslash( $_GET['page'] ) ) ) {
+			return;
+		}
+
+		if ( empty( $_GET['dcj_fpm_action'] ) || 'clear_logs' !== sanitize_key( wp_unslash( $_GET['dcj_fpm_action'] ) ) ) {
+			return;
+		}
+
+		$redirect_url = add_query_arg(
+			array(
+				'page' => self::PLUGIN_SLUG,
+			),
+			admin_url( 'admin.php' )
+		);
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'dcj-free-pdf-mailer' ) );
+		}
+
+		if ( empty( $_GET['dcj_fpm_clear_logs_nonce'] ) ) {
+			set_transient( 'dcj_fpm_admin_error', '送信ログ削除の確認に失敗しました。', 30 );
+			wp_safe_redirect( $redirect_url );
+			exit;
+		}
+
+		$nonce = sanitize_text_field( wp_unslash( $_GET['dcj_fpm_clear_logs_nonce'] ) );
+		if ( ! wp_verify_nonce( $nonce, 'dcj_fpm_clear_logs' ) ) {
+			set_transient( 'dcj_fpm_admin_error', '送信ログ削除の確認に失敗しました。', 30 );
+			wp_safe_redirect( $redirect_url );
+			exit;
+		}
+
+		update_option( self::OPTION_SUBMISSION_LOGS, array() );
+		set_transient( 'dcj_fpm_admin_success', '送信ログを削除しました。', 30 );
+
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
+
+	/**
 	 * 管理画面に送信ログ一覧を表示します。
 	 */
 	private function render_submission_logs() {
@@ -1333,10 +1378,26 @@ class DCJ_Free_PDF_Mailer {
 			'dcj_fpm_export_logs',
 			'dcj_fpm_export_logs_nonce'
 		);
+		$clear_url  = wp_nonce_url(
+			add_query_arg(
+				array(
+					'page'           => self::PLUGIN_SLUG,
+					'dcj_fpm_action' => 'clear_logs',
+				),
+				admin_url( 'admin.php' )
+			),
+			'dcj_fpm_clear_logs',
+			'dcj_fpm_clear_logs_nonce'
+		);
 
 		?>
 		<h2><?php echo esc_html( '送信ログ' ); ?></h2>
-		<p><a class="button" href="<?php echo esc_url( $export_url ); ?>"><?php echo esc_html( '送信ログをCSV出力' ); ?></a></p>
+		<p>
+			<a class="button" href="<?php echo esc_url( $export_url ); ?>"><?php echo esc_html( '送信ログをCSV出力' ); ?></a>
+			<?php if ( ! empty( $logs ) ) : ?>
+				<a class="button" href="<?php echo esc_url( $clear_url ); ?>" onclick="return confirm('<?php echo esc_attr( '送信ログをすべて削除します。元に戻せません。よろしいですか？' ); ?>');"><?php echo esc_html( '送信ログをすべて削除' ); ?></a>
+			<?php endif; ?>
+		</p>
 		<?php if ( empty( $logs ) ) : ?>
 			<p><?php echo esc_html( 'まだ送信ログはありません。' ); ?></p>
 		<?php else : ?>
