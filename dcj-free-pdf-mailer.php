@@ -58,6 +58,10 @@ class DCJ_Free_PDF_Mailer {
 
 		// 管理画面メニュー登録
 		add_action( 'admin_menu', array( $this, 'register_admin_menu' ) );
+
+		// 管理画面のメディアライブラリ選択
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_media' ) );
+		add_action( 'admin_footer', array( $this, 'output_admin_media_script' ) );
 	}
 
 	/**
@@ -691,6 +695,72 @@ class DCJ_Free_PDF_Mailer {
 	}
 
 	/**
+	 * プラグイン管理画面でメディアライブラリを読み込みます。
+	 *
+	 * @param string $hook_suffix 管理画面フック名
+	 */
+	public function enqueue_admin_media( $hook_suffix ) {
+
+		if ( 'toplevel_page_' . self::PLUGIN_SLUG !== $hook_suffix ) {
+			return;
+		}
+
+		wp_enqueue_media();
+	}
+
+	/**
+	 * メディアライブラリ選択用の管理画面スクリプトを出力します。
+	 */
+	public function output_admin_media_script() {
+
+		if ( empty( $_GET['page'] ) || self::PLUGIN_SLUG !== sanitize_key( wp_unslash( $_GET['page'] ) ) ) {
+			return;
+		}
+
+		?>
+		<script>
+		(function() {
+			document.addEventListener('click', function(event) {
+				var button = event.target.closest('.dcj-fpm-media-select-button');
+
+				if (!button || !window.wp || !window.wp.media) {
+					return;
+				}
+
+				event.preventDefault();
+
+				var targetSelector = button.getAttribute('data-target');
+				var target = targetSelector ? document.querySelector(targetSelector) : null;
+
+				if (!target) {
+					return;
+				}
+
+				var frame = window.wp.media({
+					title: button.getAttribute('data-title') || 'メディアから選択',
+					button: {
+						text: button.getAttribute('data-button-text') || 'このURLを使用'
+					},
+					multiple: false
+				});
+
+				frame.on('select', function() {
+					var attachment = frame.state().get('selection').first().toJSON();
+
+					if (attachment && attachment.url) {
+						target.value = attachment.url;
+						target.dispatchEvent(new Event('change', { bubbles: true }));
+					}
+				});
+
+				frame.open();
+			});
+		})();
+		</script>
+		<?php
+	}
+
+	/**
 	 * 管理画面一覧ページを表示します。
 	 */
 	public function display_admin_page() {
@@ -1200,6 +1270,7 @@ class DCJ_Free_PDF_Mailer {
 					<th scope="row"><label for="dcj_thumbnail_url"><?php echo esc_html( 'サムネイルURL' ); ?></label></th>
 					<td>
 						<input type="url" id="dcj_thumbnail_url" name="dcj_thumbnail_url" value="" placeholder="<?php echo esc_attr( 'https://example.com/thumbnail.jpg' ); ?>" />
+						<button type="button" class="button dcj-fpm-media-select-button" data-target="#dcj_thumbnail_url"><?php echo esc_html( 'メディアから選択' ); ?></button>
 						<p class="description"><?php echo esc_html( '将来のカード表示や管理画面プレビュー用の画像URLです。現在のメール送信には使用しません。空欄でも問題ありません。' ); ?></p>
 					</td>
 				</tr>
@@ -1207,6 +1278,7 @@ class DCJ_Free_PDF_Mailer {
 					<th scope="row"><label for="dcj_pdf_url"><?php echo esc_html( 'PDF URL' ); ?> *</label></th>
 					<td>
 						<input type="url" id="dcj_pdf_url" name="dcj_pdf_url" value="" placeholder="<?php echo esc_attr( 'https://example.com/free-pdf.pdf' ); ?>" required />
+						<button type="button" class="button dcj-fpm-media-select-button" data-target="#dcj_pdf_url"><?php echo esc_html( 'メディアから選択' ); ?></button>
 						<p class="description"><?php echo esc_html( '受信メール本文の {{pdf_url}} に入ります。必ずブラウザで直接開けるPDF URLを指定してください。/wp-content/uploads/dlm_uploads/ 配下など、直接アクセス禁止のURLは使用しないでください。' ); ?></p>
 					</td>
 				</tr>
@@ -1481,6 +1553,7 @@ class DCJ_Free_PDF_Mailer {
 					<th scope="row"><label for="dcj_edit_thumbnail_url"><?php echo esc_html( 'サムネイルURL' ); ?></label></th>
 					<td>
 						<input type="url" id="dcj_edit_thumbnail_url" name="dcj_thumbnail_url" value="<?php echo esc_url( ! empty( $pdf_item['thumbnail_url'] ) ? $pdf_item['thumbnail_url'] : '' ); ?>" />
+						<button type="button" class="button dcj-fpm-media-select-button" data-target="#dcj_edit_thumbnail_url"><?php echo esc_html( 'メディアから選択' ); ?></button>
 						<p class="description"><?php echo esc_html( '将来のカード表示や管理画面プレビュー用の画像URLです。現在のメール送信には使用しません。空欄でも問題ありません。' ); ?></p>
 					</td>
 				</tr>
@@ -1488,6 +1561,7 @@ class DCJ_Free_PDF_Mailer {
 					<th scope="row"><label for="dcj_edit_pdf_url"><?php echo esc_html( 'PDF URL' ); ?> *</label></th>
 					<td>
 						<input type="url" id="dcj_edit_pdf_url" name="dcj_pdf_url" value="<?php echo esc_url( ! empty( $pdf_item['pdf_url'] ) ? $pdf_item['pdf_url'] : '' ); ?>" required />
+						<button type="button" class="button dcj-fpm-media-select-button" data-target="#dcj_edit_pdf_url"><?php echo esc_html( 'メディアから選択' ); ?></button>
 						<p class="description"><?php echo esc_html( '受信メール本文の {{pdf_url}} に入ります。必ずブラウザで直接開けるPDF URLを指定してください。/wp-content/uploads/dlm_uploads/ 配下など、直接アクセス禁止のURLは使用しないでください。' ); ?></p>
 					</td>
 				</tr>
