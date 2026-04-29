@@ -61,6 +61,7 @@ class DCJ_Free_PDF_Mailer {
 		// 管理画面メニュー登録
 		add_action( 'admin_menu', array( $this, 'register_admin_menu' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_export_logs' ) );
+		add_action( 'admin_init', array( $this, 'handle_admin_export_optin_subscribers' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_clear_logs' ) );
 
 		// 管理画面のメディアライブラリ選択
@@ -1434,6 +1435,88 @@ class DCJ_Free_PDF_Mailer {
 	}
 
 	/**
+	 * お知らせ受信に同意したメールアドレスをCSV出力します。
+	 */
+	public function handle_admin_export_optin_subscribers() {
+
+		if ( empty( $_GET['page'] ) || self::PLUGIN_SLUG !== sanitize_key( wp_unslash( $_GET['page'] ) ) ) {
+			return;
+		}
+
+		if ( empty( $_GET['dcj_fpm_action'] ) || 'export_optin_subscribers' !== sanitize_key( wp_unslash( $_GET['dcj_fpm_action'] ) ) ) {
+			return;
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'dcj-free-pdf-mailer' ) );
+		}
+
+		if ( empty( $_GET['dcj_fpm_export_optin_subscribers_nonce'] ) ) {
+			wp_die( esc_html( 'CSV出力の確認に失敗しました。' ) );
+		}
+
+		$nonce = sanitize_text_field( wp_unslash( $_GET['dcj_fpm_export_optin_subscribers_nonce'] ) );
+		if ( ! wp_verify_nonce( $nonce, 'dcj_fpm_export_optin_subscribers' ) ) {
+			wp_die( esc_html( 'CSV出力の確認に失敗しました。' ) );
+		}
+
+		$logs        = get_option( self::OPTION_SUBMISSION_LOGS, array() );
+		$logs        = is_array( $logs ) ? $logs : array();
+		$seen_emails = array();
+		$subscribers = array();
+
+		foreach ( $logs as $log ) {
+			if ( empty( $log['newsletter_optin'] ) || 'yes' !== $log['newsletter_optin'] ) {
+				continue;
+			}
+
+			$email = ! empty( $log['email'] ) ? sanitize_email( $log['email'] ) : '';
+			if ( empty( $email ) || isset( $seen_emails[ $email ] ) ) {
+				continue;
+			}
+
+			$seen_emails[ $email ] = true;
+			$subscribers[]         = array(
+				'email'    => $email,
+				'lang'     => ! empty( $log['lang'] ) ? sanitize_key( $log['lang'] ) : '',
+				'pdf_id'   => ! empty( $log['pdf_id'] ) ? sanitize_key( $log['pdf_id'] ) : '',
+				'datetime' => ! empty( $log['datetime'] ) ? sanitize_text_field( $log['datetime'] ) : '',
+			);
+		}
+
+		$timestamp = date_i18n( 'Ymd-His', current_time( 'timestamp' ) );
+		$filename  = 'dcj-free-pdf-optin-subscribers-' . $timestamp . '.csv';
+
+		nocache_headers();
+		header( 'Content-Type: text/csv; charset=UTF-8' );
+		header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
+
+		$output = fopen( 'php://output', 'w' );
+
+		if ( false !== $output ) {
+			fwrite( $output, "\xEF\xBB\xBF" );
+			fputcsv( $output, array( 'メールアドレス', '言語', '登録元PDF ID', '同意日時', 'お知らせ同意' ) );
+
+			foreach ( $subscribers as $subscriber ) {
+				fputcsv(
+					$output,
+					array(
+						$subscriber['email'],
+						$subscriber['lang'],
+						$subscriber['pdf_id'],
+						$subscriber['datetime'],
+						'同意あり',
+					)
+				);
+			}
+
+			fclose( $output );
+		}
+
+		exit;
+	}
+
+	/**
 	 * 送信ログを全削除します。
 	 */
 	public function handle_admin_clear_logs() {
@@ -1482,8 +1565,8 @@ class DCJ_Free_PDF_Mailer {
 	 */
 	private function render_submission_logs() {
 
-		$logs       = $this->get_submission_logs( 50 );
-		$export_url = wp_nonce_url(
+		$logs             = $this->get_submission_logs( 50 );
+		$export_url       = wp_nonce_url(
 			add_query_arg(
 				array(
 					'page'           => self::PLUGIN_SLUG,
@@ -1494,7 +1577,18 @@ class DCJ_Free_PDF_Mailer {
 			'dcj_fpm_export_logs',
 			'dcj_fpm_export_logs_nonce'
 		);
-		$clear_url  = wp_nonce_url(
+		$optin_export_url = wp_nonce_url(
+			add_query_arg(
+				array(
+					'page'           => self::PLUGIN_SLUG,
+					'dcj_fpm_action' => 'export_optin_subscribers',
+				),
+				admin_url( 'admin.php' )
+			),
+			'dcj_fpm_export_optin_subscribers',
+			'dcj_fpm_export_optin_subscribers_nonce'
+		);
+		$clear_url        = wp_nonce_url(
 			add_query_arg(
 				array(
 					'page'           => self::PLUGIN_SLUG,
@@ -1510,6 +1604,7 @@ class DCJ_Free_PDF_Mailer {
 		<h2><?php echo esc_html( '送信ログ' ); ?></h2>
 		<p>
 			<a class="button" href="<?php echo esc_url( $export_url ); ?>"><?php echo esc_html( '送信ログをCSV出力' ); ?></a>
+			<a class="button" href="<?php echo esc_url( $optin_export_url ); ?>"><?php echo esc_html( '同意ありメールをCSV出力' ); ?></a>
 			<?php if ( ! empty( $logs ) ) : ?>
 				<a class="button" href="<?php echo esc_url( $clear_url ); ?>" onclick="return confirm('<?php echo esc_attr( '送信ログをすべて削除します。元に戻せません。よろしいですか？' ); ?>');"><?php echo esc_html( '送信ログをすべて削除' ); ?></a>
 			<?php endif; ?>
