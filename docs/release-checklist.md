@@ -120,6 +120,8 @@ Confirm the following after updating:
 - Email sending works.
 - PDF link opens directly.
 - Submission log is recorded and displayed.
+- If logs exist, the clear logs button is displayed.
+- If no logs exist, the clear logs button may be hidden by design.
 
 Also confirm that existing shortcodes on public pages still work.
 

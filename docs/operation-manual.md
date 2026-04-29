@@ -163,6 +163,8 @@ Columns:
 
 The admin screen displays the latest 50 logs. The plugin keeps up to 200 logs.
 
+If there are no submission logs, the clear logs button is not displayed. It appears only when at least one submission log exists.
+
 Opt-in status is also included in CSV exports. Use this status carefully if sending future updates, product news, or marketing communications.
 
 ## 12. CSV Export
