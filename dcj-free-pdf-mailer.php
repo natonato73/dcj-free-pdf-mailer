@@ -59,6 +59,7 @@ class DCJ_Free_PDF_Mailer {
 
 		// 管理画面メニュー登録
 		add_action( 'admin_menu', array( $this, 'register_admin_menu' ) );
+		add_action( 'admin_init', array( $this, 'handle_admin_export_logs' ) );
 
 		// 管理画面のメディアライブラリ選択
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_media' ) );
@@ -1255,14 +1256,87 @@ class DCJ_Free_PDF_Mailer {
 	}
 
 	/**
+	 * 送信ログをCSV出力します。
+	 */
+	public function handle_admin_export_logs() {
+
+		if ( empty( $_GET['page'] ) || self::PLUGIN_SLUG !== sanitize_key( wp_unslash( $_GET['page'] ) ) ) {
+			return;
+		}
+
+		if ( empty( $_GET['dcj_fpm_action'] ) || 'export_logs' !== sanitize_key( wp_unslash( $_GET['dcj_fpm_action'] ) ) ) {
+			return;
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'dcj-free-pdf-mailer' ) );
+		}
+
+		if ( empty( $_GET['dcj_fpm_export_logs_nonce'] ) ) {
+			wp_die( esc_html( 'CSV出力の確認に失敗しました。' ) );
+		}
+
+		$nonce = sanitize_text_field( wp_unslash( $_GET['dcj_fpm_export_logs_nonce'] ) );
+		if ( ! wp_verify_nonce( $nonce, 'dcj_fpm_export_logs' ) ) {
+			wp_die( esc_html( 'CSV出力の確認に失敗しました。' ) );
+		}
+
+		$logs      = get_option( self::OPTION_SUBMISSION_LOGS, array() );
+		$logs      = is_array( $logs ) ? $logs : array();
+		$timestamp = date_i18n( 'Ymd-His', current_time( 'timestamp' ) );
+		$filename  = 'dcj-free-pdf-submission-logs-' . $timestamp . '.csv';
+
+		nocache_headers();
+		header( 'Content-Type: text/csv; charset=UTF-8' );
+		header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
+
+		$output = fopen( 'php://output', 'w' );
+
+		if ( false !== $output ) {
+			fwrite( $output, "\xEF\xBB\xBF" );
+			fputcsv( $output, array( '日時', 'メールアドレス', 'PDF ID', '言語', '結果', 'IPアドレス' ) );
+
+			foreach ( $logs as $log ) {
+				fputcsv(
+					$output,
+					array(
+						! empty( $log['datetime'] ) ? $log['datetime'] : '',
+						! empty( $log['email'] ) ? $log['email'] : '',
+						! empty( $log['pdf_id'] ) ? $log['pdf_id'] : '',
+						! empty( $log['lang'] ) ? $log['lang'] : '',
+						! empty( $log['result'] ) ? $log['result'] : '',
+						! empty( $log['ip_address'] ) ? $log['ip_address'] : '',
+					)
+				);
+			}
+
+			fclose( $output );
+		}
+
+		exit;
+	}
+
+	/**
 	 * 管理画面に送信ログ一覧を表示します。
 	 */
 	private function render_submission_logs() {
 
-		$logs = $this->get_submission_logs( 50 );
+		$logs       = $this->get_submission_logs( 50 );
+		$export_url = wp_nonce_url(
+			add_query_arg(
+				array(
+					'page'           => self::PLUGIN_SLUG,
+					'dcj_fpm_action' => 'export_logs',
+				),
+				admin_url( 'admin.php' )
+			),
+			'dcj_fpm_export_logs',
+			'dcj_fpm_export_logs_nonce'
+		);
 
 		?>
 		<h2><?php echo esc_html( '送信ログ' ); ?></h2>
+		<p><a class="button" href="<?php echo esc_url( $export_url ); ?>"><?php echo esc_html( '送信ログをCSV出力' ); ?></a></p>
 		<?php if ( empty( $logs ) ) : ?>
 			<p><?php echo esc_html( 'まだ送信ログはありません。' ); ?></p>
 		<?php else : ?>
