@@ -535,11 +535,11 @@ class DCJ_Free_PDF_Mailer {
 				? 'ご入力いただいたメールアドレスは、無料PDFのご案内に使用します。'
 				: 'Your email address will be used to send this free PDF.' );
 		$newsletter_optin_text = 'ja' === $lang
-			? '新作の無料PDF、塗り絵ニュース、関連商品の案内メールを受け取る'
-			: 'I would like to receive updates about free PDFs, coloring news, and related products.';
+			? '新作の無料PDF、季節の塗り絵情報、デジタル書籍の割引クーポンをメールで受け取る'
+			: 'I would like to receive new free PDFs, seasonal coloring ideas, and discount coupons for digital books by email.';
 		$newsletter_optin_note = 'ja' === $lang
-			? 'チェックしなくても無料PDFはお受け取りいただけます。'
-			: 'You can receive the free PDF even if you do not check this box.';
+			? 'チェックしなくても無料PDFはお受け取りいただけます。お知らせやクーポンは不定期でお送りします。'
+			: 'You can receive the free PDF even if you do not check this box. Updates and coupons are sent occasionally.';
 
 		$html  = '<div class="' . esc_attr( self::CSS_PREFIX . 'form-container' ) . '" data-pdf-id="' . esc_attr( $pdf_id ) . '">';
 		$html .= '<form method="post" action="" class="' . esc_attr( self::CSS_PREFIX . 'form' ) . '">';
