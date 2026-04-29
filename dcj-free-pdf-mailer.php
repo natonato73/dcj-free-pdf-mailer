@@ -319,6 +319,8 @@ class DCJ_Free_PDF_Mailer {
 			return;
 		}
 
+		$newsletter_optin = ! empty( $_POST['dcj_newsletter_optin'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['dcj_newsletter_optin'] ) ) ? 'yes' : 'no';
+
 		// 重複送信防止チェック（5分以内）
 		$duplicate_key = md5( $pdf_id . $email );
 		if ( get_transient( 'dcj_fpm_sent_' . $duplicate_key ) ) {
@@ -369,7 +371,7 @@ class DCJ_Free_PDF_Mailer {
 		}
 
 		$sent = wp_mail( $email, $subject, $body, $headers );
-		$this->save_submission_log( $email, $pdf_id, ! empty( $pdf_item['lang'] ) ? $pdf_item['lang'] : '', $sent ? 'success' : 'failed' );
+		$this->save_submission_log( $email, $pdf_id, ! empty( $pdf_item['lang'] ) ? $pdf_item['lang'] : '', $sent ? 'success' : 'failed', $newsletter_optin );
 
 		if ( $sent ) {
 			// 送信成功後、重複送信防止フラグを5分間保存
@@ -389,8 +391,9 @@ class DCJ_Free_PDF_Mailer {
 	 * @param string $pdf_id PDF識別ID
 	 * @param string $lang 言語
 	 * @param string $result 送信結果
+	 * @param string $newsletter_optin お知らせ受信同意
 	 */
-	private function save_submission_log( $email, $pdf_id, $lang, $result ) {
+	private function save_submission_log( $email, $pdf_id, $lang, $result, $newsletter_optin = 'no' ) {
 
 		$logs       = get_option( self::OPTION_SUBMISSION_LOGS, array() );
 		$logs       = is_array( $logs ) ? $logs : array();
@@ -409,6 +412,7 @@ class DCJ_Free_PDF_Mailer {
 				'lang'       => sanitize_key( $lang ),
 				'result'     => 'success' === $result ? 'success' : 'failed',
 				'ip_address' => $ip_address,
+				'newsletter_optin' => 'yes' === $newsletter_optin ? 'yes' : 'no',
 			)
 		);
 
@@ -530,6 +534,12 @@ class DCJ_Free_PDF_Mailer {
 			: ( 'ja' === $lang
 				? 'ご入力いただいたメールアドレスは、無料PDFのご案内に使用します。'
 				: 'Your email address will be used to send this free PDF.' );
+		$newsletter_optin_text = 'ja' === $lang
+			? '新作の無料PDF、塗り絵ニュース、関連商品の案内メールを受け取る'
+			: 'I would like to receive updates about free PDFs, coloring news, and related products.';
+		$newsletter_optin_note = 'ja' === $lang
+			? 'チェックしなくても無料PDFはお受け取りいただけます。'
+			: 'You can receive the free PDF even if you do not check this box.';
 
 		$html  = '<div class="' . esc_attr( self::CSS_PREFIX . 'form-container' ) . '" data-pdf-id="' . esc_attr( $pdf_id ) . '">';
 		$html .= '<form method="post" action="" class="' . esc_attr( self::CSS_PREFIX . 'form' ) . '">';
@@ -567,6 +577,17 @@ class DCJ_Free_PDF_Mailer {
 		$html .= 'required ';
 		$html .= 'placeholder="' . esc_attr( 'example@example.com' ) . '" ';
 		$html .= '/>';
+		$html .= '</div>';
+
+		// お知らせ受信同意
+		$html .= '<div class="' . esc_attr( self::CSS_PREFIX . 'form-group' ) . '">';
+		$html .= '<label class="' . esc_attr( self::CSS_PREFIX . 'label' ) . '">';
+		$html .= '<input type="checkbox" name="dcj_newsletter_optin" value="' . esc_attr( '1' ) . '" /> ';
+		$html .= esc_html( $newsletter_optin_text );
+		$html .= '</label>';
+		$html .= '<div class="' . esc_attr( self::CSS_PREFIX . 'note' ) . '">';
+		$html .= esc_html( $newsletter_optin_note );
+		$html .= '</div>';
 		$html .= '</div>';
 
 		// 送信ボタン
@@ -1387,9 +1408,11 @@ class DCJ_Free_PDF_Mailer {
 
 		if ( false !== $output ) {
 			fwrite( $output, "\xEF\xBB\xBF" );
-			fputcsv( $output, array( '日時', 'メールアドレス', 'PDF ID', '言語', '結果', 'IPアドレス' ) );
+			fputcsv( $output, array( '日時', 'メールアドレス', 'PDF ID', '言語', '結果', 'IPアドレス', 'お知らせ同意' ) );
 
 			foreach ( $logs as $log ) {
+				$newsletter_optin_label = ! empty( $log['newsletter_optin'] ) && 'yes' === $log['newsletter_optin'] ? '同意あり' : '同意なし';
+
 				fputcsv(
 					$output,
 					array(
@@ -1399,6 +1422,7 @@ class DCJ_Free_PDF_Mailer {
 						! empty( $log['lang'] ) ? $log['lang'] : '',
 						! empty( $log['result'] ) ? $log['result'] : '',
 						! empty( $log['ip_address'] ) ? $log['ip_address'] : '',
+						$newsletter_optin_label,
 					)
 				);
 			}
@@ -1502,10 +1526,12 @@ class DCJ_Free_PDF_Mailer {
 						<th><?php echo esc_html( '言語' ); ?></th>
 						<th><?php echo esc_html( '結果' ); ?></th>
 						<th><?php echo esc_html( 'IPアドレス' ); ?></th>
+						<th><?php echo esc_html( 'お知らせ同意' ); ?></th>
 					</tr>
 				</thead>
 				<tbody>
 					<?php foreach ( $logs as $log ) : ?>
+						<?php $newsletter_optin_label = ! empty( $log['newsletter_optin'] ) && 'yes' === $log['newsletter_optin'] ? '同意あり' : '同意なし'; ?>
 						<tr>
 							<td><?php echo esc_html( ! empty( $log['datetime'] ) ? $log['datetime'] : '' ); ?></td>
 							<td><?php echo esc_html( ! empty( $log['email'] ) ? $log['email'] : '' ); ?></td>
@@ -1513,6 +1539,7 @@ class DCJ_Free_PDF_Mailer {
 							<td><?php echo esc_html( ! empty( $log['lang'] ) ? $log['lang'] : '' ); ?></td>
 							<td><?php echo esc_html( ! empty( $log['result'] ) ? $log['result'] : '' ); ?></td>
 							<td><?php echo esc_html( ! empty( $log['ip_address'] ) ? $log['ip_address'] : '' ); ?></td>
+							<td><?php echo esc_html( $newsletter_optin_label ); ?></td>
 						</tr>
 					<?php endforeach; ?>
 				</tbody>
