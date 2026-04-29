@@ -755,6 +755,72 @@ class DCJ_Free_PDF_Mailer {
 
 				frame.open();
 			});
+
+			var defaults = {
+				ja: {
+					dcj_title: 'サンプル塗り絵 無料PDF',
+					dcj_description: 'メールアドレスを入力すると、無料PDFのご案内をお送りします。',
+					dcj_mail_subject: '【Dream Coloring Journey】無料PDFダウンロードリンクのご案内',
+					dcj_mail_body: 'こんにちは。\n\n{{title}} にお申し込みいただき、ありがとうございます。\n\n以下のリンクからPDFをダウンロードできます。\n\n{{pdf_url}}\n\n利用条件：\n{{terms_text}}\n\n塗り絵の時間を楽しんでいただければ嬉しいです。\n\nDream Coloring Journey',
+					dcj_button_text: '送信する',
+					dcj_label_text: 'メールアドレス',
+					dcj_note_text: 'ご入力いただいたメールアドレスは、無料PDFのご案内に使用します。',
+					dcj_success_message: '無料PDFのご案内メールを送信しました。メールボックスをご確認ください。メールが見つからない場合は、迷惑メールフォルダやプロモーションフォルダもご確認ください。',
+					dcj_duplicate_message: 'すでにお申し込み済みです。メールボックスをご確認ください。',
+					dcj_disabled_message: 'この無料PDFは現在配布を停止しています。',
+					dcj_terms_text: '家庭内での個人利用に限ります。再配布・二次配布・商用利用は禁止です。'
+				},
+				en: {
+					dcj_title: 'Free Coloring PDF Sample',
+					dcj_description: 'Enter your email address to receive the free PDF download link.',
+					dcj_mail_subject: 'Your Free PDF Download Link from Dream Coloring Journey',
+					dcj_mail_body: 'Hello,\n\nThank you for requesting {{title}}.\n\nYou can download your PDF from the link below:\n\n{{pdf_url}}\n\nTerms of use:\n{{terms_text}}\n\nWe hope you enjoy your coloring time.\n\nDream Coloring Journey',
+					dcj_button_text: 'Send',
+					dcj_label_text: 'Email address',
+					dcj_note_text: 'Your email address will be used to send this free PDF.',
+					dcj_success_message: 'Your free PDF email has been sent. Please check your inbox. If you cannot find the email, please check your spam or promotions folder.',
+					dcj_duplicate_message: 'You have already requested this PDF. Please check your inbox.',
+					dcj_disabled_message: 'This free PDF is currently unavailable.',
+					dcj_terms_text: 'For personal and family use only. Redistribution, resale, and commercial use are not allowed.'
+				}
+			};
+
+			function isDefaultValue(fieldId, value) {
+				return value === defaults.ja[fieldId] || value === defaults.en[fieldId];
+			}
+
+			function updateAddFormDefaults(lang) {
+				var fieldId;
+				var field;
+
+				if (!defaults[lang]) {
+					return;
+				}
+
+				for (fieldId in defaults[lang]) {
+					if (!Object.prototype.hasOwnProperty.call(defaults[lang], fieldId)) {
+						continue;
+					}
+
+					field = document.getElementById(fieldId);
+
+					if (!field) {
+						continue;
+					}
+
+					if ('' === field.value || isDefaultValue(fieldId, field.value)) {
+						field.value = defaults[lang][fieldId];
+					}
+				}
+			}
+
+			var langSelect = document.getElementById('dcj_lang');
+
+			if (langSelect) {
+				langSelect.addEventListener('change', function() {
+					updateAddFormDefaults(langSelect.value);
+				});
+			}
 		})();
 		</script>
 		<?php
