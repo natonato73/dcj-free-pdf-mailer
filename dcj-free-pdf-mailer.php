@@ -71,6 +71,7 @@ class DCJ_Free_PDF_Mailer {
 		add_action( 'admin_init', array( $this, 'handle_admin_export_logs' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_export_optin_subscribers' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_export_subscribers' ) );
+		add_action( 'admin_init', array( $this, 'handle_admin_export_broadcast_subscribers' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_update_subscriber_status' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_delete_subscriber' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_clear_logs' ) );
@@ -1998,6 +1999,54 @@ class DCJ_Free_PDF_Mailer {
 	}
 
 	/**
+	 * 配信用の購読者CSVを出力します。
+	 */
+	public function handle_admin_export_broadcast_subscribers() {
+
+		if ( empty( $_GET['page'] ) || self::PLUGIN_SLUG !== sanitize_key( wp_unslash( $_GET['page'] ) ) ) {
+			return;
+		}
+
+		if ( empty( $_GET['dcj_fpm_action'] ) || 'export_broadcast_subscribers' !== sanitize_key( wp_unslash( $_GET['dcj_fpm_action'] ) ) ) {
+			return;
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'dcj-free-pdf-mailer' ) );
+		}
+
+		if ( empty( $_GET['dcj_fpm_export_broadcast_subscribers_nonce'] ) ) {
+			wp_die( esc_html( '配信用CSV出力の確認に失敗しました。' ) );
+		}
+
+		$nonce = sanitize_text_field( wp_unslash( $_GET['dcj_fpm_export_broadcast_subscribers_nonce'] ) );
+		if ( ! wp_verify_nonce( $nonce, 'dcj_fpm_export_broadcast_subscribers' ) ) {
+			wp_die( esc_html( '配信用CSV出力の確認に失敗しました。' ) );
+		}
+
+		$subscriber_filters           = DCJ_FPM_Subscriber_Helper::get_filters_from_request();
+		$subscriber_filters['status'] = 'subscribed';
+		$subscribers                  = DCJ_FPM_Subscriber_Helper::filter_subscribers( $this->get_subscribers( 0 ), $subscriber_filters );
+		$timestamp                    = date_i18n( 'Ymd-His', current_time( 'timestamp' ) );
+		$filename                     = 'dcj-broadcast-subscribers-' . $timestamp . '.csv';
+		$rows                         = array(
+			array( 'メールアドレス', '言語', '登録元PDF ID', '登録元タイトル', '最終同意日時' ),
+		);
+
+		foreach ( $subscribers as $subscriber ) {
+			$rows[] = array(
+				! empty( $subscriber['email'] ) ? $subscriber['email'] : '',
+				! empty( $subscriber['lang'] ) ? $subscriber['lang'] : '',
+				! empty( $subscriber['source_pdf_id'] ) ? $subscriber['source_pdf_id'] : '',
+				! empty( $subscriber['source_title'] ) ? $subscriber['source_title'] : '',
+				! empty( $subscriber['last_seen_datetime'] ) ? $subscriber['last_seen_datetime'] : '',
+			);
+		}
+
+		DCJ_FPM_CSV_Exporter::output_csv( $filename, $rows );
+	}
+
+	/**
 	 * 購読者ステータスを更新します。
 	 */
 	public function handle_admin_update_subscriber_status() {
@@ -2296,14 +2345,29 @@ class DCJ_Free_PDF_Mailer {
 			'dcj_fpm_export_subscribers',
 			'dcj_fpm_export_subscribers_nonce'
 		);
+		$broadcast_export_url      = wp_nonce_url(
+			add_query_arg(
+				array(
+					'page'                  => self::PLUGIN_SLUG,
+					'dcj_fpm_action'        => 'export_broadcast_subscribers',
+					'dcj_subscriber_search' => $subscriber_search,
+					'dcj_subscriber_status' => 'subscribed',
+				),
+				admin_url( 'admin.php' )
+			),
+			'dcj_fpm_export_broadcast_subscribers',
+			'dcj_fpm_export_broadcast_subscribers_nonce'
+		);
 
 		?>
 		<h2><?php echo esc_html( '購読者リスト' ); ?></h2>
 		<p>
 			<a class="button" href="<?php echo esc_url( $export_url ); ?>"><?php echo esc_html( '購読者リストをCSV出力' ); ?></a>
+			<a class="button button-secondary" href="<?php echo esc_url( $broadcast_export_url ); ?>"><?php echo esc_html( '配信用CSV出力' ); ?></a>
 		</p>
 		<p><?php echo esc_html( '現在の検索・絞り込み条件はCSV出力にも反映されます。' ); ?></p>
-		<p><?php echo esc_html( 'お知らせ配信・販売案内・クーポン案内に使う場合は、ステータスを「購読中」に絞り込んでCSV出力してください。' ); ?></p>
+		<p><?php echo esc_html( '購読者リストCSVは管理・バックアップ用です。配信用CSVはメール配信サービスへの手動インポート用で、購読中のメールアドレスのみを出力します。' ); ?></p>
+		<p><?php echo esc_html( 'お知らせ配信・販売案内・クーポン案内には、購読中のメールアドレスのみを使用してください。配信停止の方には送らないでください。' ); ?></p>
 		<p><?php echo esc_html( '削除前に必要に応じて購読者CSVを出力してください。削除した購読者は元に戻せません。' ); ?></p>
 		<form method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" style="margin: 1em 0;">
 			<input type="hidden" name="page" value="<?php echo esc_attr( self::PLUGIN_SLUG ); ?>">
