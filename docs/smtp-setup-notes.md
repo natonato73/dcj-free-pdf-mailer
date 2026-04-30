@@ -19,11 +19,68 @@ However, the actual delivery route depends on the WordPress site and server envi
 
 Current production behavior:
 
+- WP Mail SMTP with ConoHa SMTP has been configured on production.
 - Production email sending succeeds.
-- Gmail may show a message similar to delivery through the hosting server, such as ConoHa.
-- Emails may be placed in spam, junk, or promotions folders depending on the recipient mailbox and sending environment.
+- From display has been confirmed as `Dream Coloring Journey <info@dreamcoloringjourney.com>`.
+- The previous Gmail-style display such as delivery through `www228.conoha.ne.jp` has been improved in the confirmed production test.
+- Emails may still be placed in spam, junk, or promotions folders depending on the recipient mailbox and sending environment.
 
 This means the plugin can send mail, but delivery quality may still depend on server-side mail configuration.
+
+## 2-1. 本番確認済みSMTP設定
+
+本番環境では、WP Mail SMTP と ConoHa WING のメールアドレスを使って、以下の設定で送信元表示の改善を確認しました。
+
+秘密情報は記録しません。SMTPパスワードは、このドキュメントやGitHubには保存しないでください。
+
+| 項目 | 設定内容 |
+| --- | --- |
+| 使用プラグイン | WP Mail SMTP |
+| メーラー | その他のSMTP |
+| 送信者名 | Dream Coloring Journey |
+| 送信元メールアドレス | info@dreamcoloringjourney.com |
+| 送信元メールアドレスを強制使用 | ON |
+| 送信者名を強制使用 | ON |
+| SMTPホスト | ConoHa WINGで表示されるSMTPサーバー |
+| 暗号化 | SSL |
+| SMTPポート | 465 |
+| 自動TLS | OFF |
+| SMTP認証 | ON |
+| SMTPユーザー名 | info@dreamcoloringjourney.com |
+| SMTPパスワード | 記録しない。ConoHa WINGで作成したメールアドレスのパスワードを使う |
+
+### 本番確認結果
+
+- WP Mail SMTPのテストメール送信：OK
+- DCJ Free PDF Mailerのメール送信診断：OK
+- 無料PDFフォームからの実送信：OK
+- 差出人表示：`Dream Coloring Journey <info@dreamcoloringjourney.com>`
+- 以前のような `www228.conoha.ne.jp 経由` 表示の改善を確認
+
+### 推奨設定まとめ
+
+| 項目 | 推奨設定 | メモ |
+| --- | --- | --- |
+| 送信者名 | Dream Coloring Journey | 差出人名として表示 |
+| 送信元メール | info@dreamcoloringjourney.com | 受信可能なブランド用メール |
+| 送信元メールアドレスを強制使用 | ON | WordPress側の送信元を統一しやすくする |
+| 送信者名を強制使用 | ON | 差出人名のブレを減らす |
+| メーラー | その他のSMTP | ConoHa SMTPを使う場合 |
+| SMTPホスト | ConoHa WINGで表示されるSMTPサーバー | 実際の値はConoHa WING画面で確認 |
+| 暗号化 | SSL | ポート465とセット |
+| SMTPポート | 465 | SSL利用時の一般的な設定 |
+| 自動TLS | OFF | SSL+465ではOFF推奨 |
+| SMTP認証 | ON | メールアドレスとパスワードで認証 |
+| SMTPユーザー名 | info@dreamcoloringjourney.com | ConoHa WINGで作成したメールアドレス |
+| SMTPパスワード | ドキュメントに記録しない | 安全な場所で管理する |
+
+### 注意事項
+
+- この設定はメール到達を保証するものではありません。
+- メール到達率は、サーバー環境、DNS設定、SMTP設定、受信側メール環境に影響されます。
+- 必要に応じてSPF / DKIM / DMARCの確認が必要です。
+- SMTPパスワードは、ドキュメントやGitHubに保存しないでください。
+- WordPress側とDCJ Free PDF Mailer側の送信者名・送信元メールアドレスは揃えてください。
 
 ## 3. Why SMTP Setup May Be Needed
 
