@@ -51,6 +51,14 @@ The plugin has been checked in a LocalWP development environment and on the prod
 4. Add a PDF setting.
 5. Place the shortcode on a page or post.
 
+## File Structure And Distribution
+
+The plugin is made of the main `dcj-free-pdf-mailer.php` file and helper classes under `includes/`.
+
+The `includes/` folder contains admin notice display, CSV export helpers, reCAPTCHA v3 verification, unsubscribe URL handling, subscriber helper logic, and `includes/index.php` for direct access protection. This split keeps the existing behavior while making the code easier to maintain.
+
+When creating a distribution zip, include the `includes/` folder. Do not include development files such as `.git` or `.codex` in the zip.
+
 ## Shortcode Example
 
 ```text
