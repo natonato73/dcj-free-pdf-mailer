@@ -1244,6 +1244,7 @@ class DCJ_Free_PDF_Mailer {
 			</div>
 
 			<?php $this->render_mail_settings_form(); ?>
+			<?php $this->render_mail_diagnostics(); ?>
 			
 			<h2><?php echo esc_html( 'PDF設定一覧' ); ?></h2>
 			
@@ -1358,6 +1359,10 @@ class DCJ_Free_PDF_Mailer {
 		// 権限チェック
 		if ( ! current_user_can( 'manage_options' ) ) {
 			return false;
+		}
+
+		if ( ! empty( $_POST['dcj_fpm_test_email_submit'] ) ) {
+			return $this->handle_admin_test_email();
 		}
 
 		if ( ! empty( $_POST['dcj_fpm_mail_settings_submit'] ) ) {
@@ -1550,6 +1555,201 @@ class DCJ_Free_PDF_Mailer {
 			<?php submit_button( 'メール送信設定を保存' ); ?>
 		</form>
 		<?php
+	}
+
+	/**
+	 * 管理画面からのテストメール送信を処理します。
+	 *
+	 * @return bool
+	 */
+	private function handle_admin_test_email() {
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return false;
+		}
+
+		if ( empty( $_POST['dcj_fpm_test_email_nonce'] ) ) {
+			set_transient( 'dcj_fpm_admin_error', 'テストメール送信の確認に失敗しました。', 30 );
+			return false;
+		}
+
+		$nonce = sanitize_text_field( wp_unslash( $_POST['dcj_fpm_test_email_nonce'] ) );
+		if ( ! wp_verify_nonce( $nonce, 'dcj_fpm_test_email' ) ) {
+			set_transient( 'dcj_fpm_admin_error', 'テストメール送信の確認に失敗しました。', 30 );
+			return false;
+		}
+
+		$to = ! empty( $_POST['dcj_fpm_test_email_to'] ) ? sanitize_email( wp_unslash( $_POST['dcj_fpm_test_email_to'] ) ) : '';
+		if ( empty( $to ) || ! is_email( $to ) ) {
+			set_transient( 'dcj_fpm_admin_error', 'テスト送信先メールアドレスの形式が正しくありません。', 30 );
+			return false;
+		}
+
+		$mail_settings = $this->get_mail_settings();
+		$headers       = array();
+
+		if ( ! empty( $mail_settings['from_email'] ) && is_email( $mail_settings['from_email'] ) ) {
+			$headers[] = 'From: ' . $mail_settings['from_name'] . ' <' . $mail_settings['from_email'] . '>';
+		}
+
+		$subject = '【DCJ Free PDF Mailer】テストメール';
+		$body    = "これは DCJ Free PDF Mailer のメール送信診断テストです。\nこのメールが届いていれば、WordPress からの基本的なメール送信は動作しています。";
+		$sent    = wp_mail( $to, $subject, $body, $headers );
+
+		if ( $sent ) {
+			set_transient( 'dcj_fpm_admin_success', 'テストメールを送信しました。受信箱や迷惑メールフォルダを確認してください。', 30 );
+			return true;
+		}
+
+		set_transient( 'dcj_fpm_admin_error', 'テストメールの送信に失敗しました。SMTP設定やサーバーのメール送信設定を確認してください。', 30 );
+		return false;
+	}
+
+	/**
+	 * メール送信診断を表示します。
+	 */
+	private function render_mail_diagnostics() {
+
+		$mail_settings     = $this->get_mail_settings();
+		$site_url          = home_url();
+		$site_domain       = $this->get_site_domain();
+		$admin_email       = get_option( 'admin_email' );
+		$from_name         = ! empty( $mail_settings['from_name'] ) ? $mail_settings['from_name'] : '';
+		$from_email        = ! empty( $mail_settings['from_email'] ) ? $mail_settings['from_email'] : '';
+		$from_domain       = $this->get_mail_domain_from_email( $from_email );
+		$diagnostic_items  = array();
+
+		if ( empty( $from_email ) ) {
+			$diagnostic_items[] = array(
+				'type'    => 'warning',
+				'label'   => '警告',
+				'message' => '送信元メールアドレスが未設定です。WordPressやサーバーの初期設定で送信される場合があります。',
+			);
+		} elseif ( ! is_email( $from_email ) ) {
+			$diagnostic_items[] = array(
+				'type'    => 'warning',
+				'label'   => '警告',
+				'message' => '送信元メールアドレスの形式が正しくありません。',
+			);
+		} elseif ( ! empty( $site_domain ) && ! empty( $from_domain ) && $site_domain !== $from_domain ) {
+			$diagnostic_items[] = array(
+				'type'    => 'notice',
+				'label'   => '注意',
+				'message' => '送信元メールアドレスのドメインとサイトドメインが異なります。メール到達率に影響する場合があります。',
+			);
+		}
+
+		if ( ! empty( $admin_email ) && ! empty( $from_email ) && strtolower( $admin_email ) !== strtolower( $from_email ) ) {
+			$diagnostic_items[] = array(
+				'type'    => 'info',
+				'label'   => '参考',
+				'message' => 'WordPress管理者メールと送信元メールアドレスが異なります。運用上問題ない設定か確認してください。',
+			);
+		}
+
+		if ( empty( $diagnostic_items ) ) {
+			$diagnostic_items[] = array(
+				'type'    => 'ok',
+				'label'   => 'OK',
+				'message' => '基本的な設定に大きな問題は見つかりませんでした。',
+			);
+		}
+
+		?>
+		<h2><?php echo esc_html( 'メール送信診断' ); ?></h2>
+		<p><?php echo esc_html( 'メール到達トラブルの初期確認用です。現在のサイト情報と送信元設定を簡易チェックします。' ); ?></p>
+		<table class="widefat striped" style="max-width: 900px;">
+			<tbody>
+				<tr>
+					<th scope="row"><?php echo esc_html( 'サイトURL' ); ?></th>
+					<td><?php echo esc_html( $site_url ); ?></td>
+				</tr>
+				<tr>
+					<th scope="row"><?php echo esc_html( 'サイトドメイン' ); ?></th>
+					<td><?php echo esc_html( ! empty( $site_domain ) ? $site_domain : '取得できませんでした' ); ?></td>
+				</tr>
+				<tr>
+					<th scope="row"><?php echo esc_html( 'WordPress管理者メールアドレス' ); ?></th>
+					<td><?php echo esc_html( $admin_email ); ?></td>
+				</tr>
+				<tr>
+					<th scope="row"><?php echo esc_html( '現在設定されている送信者名' ); ?></th>
+					<td><?php echo esc_html( $from_name ); ?></td>
+				</tr>
+				<tr>
+					<th scope="row"><?php echo esc_html( '現在設定されている送信元メールアドレス' ); ?></th>
+					<td><?php echo esc_html( ! empty( $from_email ) ? $from_email : '未設定' ); ?></td>
+				</tr>
+				<tr>
+					<th scope="row"><?php echo esc_html( '送信元メールアドレスのドメイン' ); ?></th>
+					<td><?php echo esc_html( ! empty( $from_domain ) ? $from_domain : '取得できませんでした' ); ?></td>
+				</tr>
+			</tbody>
+		</table>
+
+		<h3><?php echo esc_html( 'チェック結果' ); ?></h3>
+		<ul>
+			<?php foreach ( $diagnostic_items as $item ) : ?>
+				<li>
+					<strong><?php echo esc_html( $item['label'] ); ?>:</strong>
+					<?php echo esc_html( $item['message'] ); ?>
+				</li>
+			<?php endforeach; ?>
+		</ul>
+
+		<div class="notice notice-info inline">
+			<p><?php echo esc_html( 'この診断は簡易チェックです。メール到達を保証するものではありません。迷惑メール対策にはSMTP設定やSPF / DKIM / DMARCの確認が必要になる場合があります。Gmailなどではサーバー経由表示や迷惑メール判定が出る場合があります。' ); ?></p>
+		</div>
+
+		<h3><?php echo esc_html( 'テストメール送信' ); ?></h3>
+		<p><?php echo esc_html( 'WordPressから基本的なメール送信ができるか確認するため、指定したメールアドレスへテストメールを送信します。' ); ?></p>
+		<form method="post" action="">
+			<table class="form-table">
+				<tr>
+					<th scope="row"><label for="dcj_fpm_test_email_to"><?php echo esc_html( 'テスト送信先メールアドレス' ); ?></label></th>
+					<td><input type="email" id="dcj_fpm_test_email_to" name="dcj_fpm_test_email_to" class="regular-text" value="" /></td>
+				</tr>
+			</table>
+			<input type="hidden" name="dcj_fpm_test_email_nonce" value="<?php echo esc_attr( wp_create_nonce( 'dcj_fpm_test_email' ) ); ?>" />
+			<input type="hidden" name="dcj_fpm_test_email_submit" value="1" />
+			<?php submit_button( 'テストメールを送信', 'secondary' ); ?>
+		</form>
+		<?php
+	}
+
+	/**
+	 * メールアドレスからドメインを取得します。
+	 *
+	 * @param string $email メールアドレス
+	 * @return string
+	 */
+	private function get_mail_domain_from_email( $email ) {
+
+		if ( empty( $email ) || ! is_email( $email ) ) {
+			return '';
+		}
+
+		$parts = explode( '@', $email );
+		if ( empty( $parts[1] ) ) {
+			return '';
+		}
+
+		return strtolower( preg_replace( '/^www\./', '', sanitize_text_field( $parts[1] ) ) );
+	}
+
+	/**
+	 * サイトURLからドメインを取得します。
+	 *
+	 * @return string
+	 */
+	private function get_site_domain() {
+
+		$host = wp_parse_url( home_url(), PHP_URL_HOST );
+		if ( empty( $host ) ) {
+			return '';
+		}
+
+		return strtolower( preg_replace( '/^www\./', '', sanitize_text_field( $host ) ) );
 	}
 
 	/**
