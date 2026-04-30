@@ -1922,8 +1922,46 @@ class DCJ_Free_PDF_Mailer {
 	 */
 	private function render_submission_logs() {
 
-		$logs             = $this->get_submission_logs( 50 );
-		$export_url       = wp_nonce_url(
+		$logs                          = $this->get_submission_logs( 50 );
+		$log_email_search              = ! empty( $_GET['dcj_log_email_search'] ) ? sanitize_text_field( wp_unslash( $_GET['dcj_log_email_search'] ) ) : '';
+		$log_pdf_id_search             = ! empty( $_GET['dcj_log_pdf_id_search'] ) ? sanitize_text_field( wp_unslash( $_GET['dcj_log_pdf_id_search'] ) ) : '';
+		$log_newsletter_consent_filter = ! empty( $_GET['dcj_log_newsletter_consent'] ) ? sanitize_key( wp_unslash( $_GET['dcj_log_newsletter_consent'] ) ) : 'all';
+		$log_newsletter_consent_filter = in_array( $log_newsletter_consent_filter, array( 'all', 'yes', 'no' ), true ) ? $log_newsletter_consent_filter : 'all';
+		$total_log_count               = count( $logs );
+
+		if ( '' !== $log_email_search || '' !== $log_pdf_id_search || 'all' !== $log_newsletter_consent_filter ) {
+			$logs = array_filter(
+				$logs,
+				function ( $log ) use ( $log_email_search, $log_pdf_id_search, $log_newsletter_consent_filter ) {
+					$email              = ! empty( $log['email'] ) ? sanitize_email( $log['email'] ) : '';
+					$pdf_id             = ! empty( $log['pdf_id'] ) ? sanitize_text_field( $log['pdf_id'] ) : '';
+					$newsletter_consent = ! empty( $log['newsletter_optin'] ) && 'yes' === $log['newsletter_optin'] ? 'yes' : 'no';
+
+					if ( '' !== $log_email_search && false === stripos( $email, $log_email_search ) ) {
+						return false;
+					}
+
+					if ( '' !== $log_pdf_id_search && false === stripos( $pdf_id, $log_pdf_id_search ) ) {
+						return false;
+					}
+
+					if ( 'all' !== $log_newsletter_consent_filter && $newsletter_consent !== $log_newsletter_consent_filter ) {
+						return false;
+					}
+
+					return true;
+				}
+			);
+		}
+
+		$filtered_log_count = count( $logs );
+		$clear_search_url   = add_query_arg(
+			array(
+				'page' => self::PLUGIN_SLUG,
+			),
+			admin_url( 'admin.php' )
+		);
+		$export_url         = wp_nonce_url(
 			add_query_arg(
 				array(
 					'page'           => self::PLUGIN_SLUG,
@@ -1962,12 +2000,31 @@ class DCJ_Free_PDF_Mailer {
 		<p>
 			<a class="button" href="<?php echo esc_url( $export_url ); ?>"><?php echo esc_html( '送信ログをCSV出力' ); ?></a>
 			<a class="button" href="<?php echo esc_url( $optin_export_url ); ?>"><?php echo esc_html( '同意ありメールをCSV出力' ); ?></a>
-			<?php if ( ! empty( $logs ) ) : ?>
+			<?php if ( 0 < $total_log_count ) : ?>
 				<a class="button" href="<?php echo esc_url( $clear_url ); ?>" onclick="return confirm('<?php echo esc_attr( '送信ログをすべて削除します。元に戻せません。よろしいですか？' ); ?>');"><?php echo esc_html( '送信ログをすべて削除' ); ?></a>
 			<?php endif; ?>
 		</p>
+		<form method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" style="margin: 1em 0;">
+			<input type="hidden" name="page" value="<?php echo esc_attr( self::PLUGIN_SLUG ); ?>">
+			<label for="dcj-log-email-search"><?php echo esc_html( 'メールアドレス検索' ); ?></label>
+			<input type="text" id="dcj-log-email-search" name="dcj_log_email_search" value="<?php echo esc_attr( $log_email_search ); ?>">
+			<label for="dcj-log-pdf-id-search"><?php echo esc_html( 'PDF管理ID検索' ); ?></label>
+			<input type="text" id="dcj-log-pdf-id-search" name="dcj_log_pdf_id_search" value="<?php echo esc_attr( $log_pdf_id_search ); ?>">
+			<label for="dcj-log-newsletter-consent"><?php echo esc_html( 'お知らせ同意' ); ?></label>
+			<select id="dcj-log-newsletter-consent" name="dcj_log_newsletter_consent">
+				<option value="all" <?php selected( $log_newsletter_consent_filter, 'all' ); ?>><?php echo esc_html( 'すべて' ); ?></option>
+				<option value="yes" <?php selected( $log_newsletter_consent_filter, 'yes' ); ?>><?php echo esc_html( '同意あり' ); ?></option>
+				<option value="no" <?php selected( $log_newsletter_consent_filter, 'no' ); ?>><?php echo esc_html( '同意なし' ); ?></option>
+			</select>
+			<button type="submit" class="button"><?php echo esc_html( '検索' ); ?></button>
+			<a href="<?php echo esc_url( $clear_search_url ); ?>"><?php echo esc_html( 'クリア' ); ?></a>
+		</form>
+		<p>
+			<?php echo esc_html( '送信ログ一覧：' . $total_log_count . '件' ); ?><br>
+			<?php echo esc_html( '絞り込み結果：' . $filtered_log_count . '件' ); ?>
+		</p>
 		<?php if ( empty( $logs ) ) : ?>
-			<p><?php echo esc_html( 'まだ送信ログはありません。' ); ?></p>
+			<p><?php echo esc_html( 0 === $total_log_count ? 'まだ送信ログはありません。' : '条件に一致する送信ログはありません。' ); ?></p>
 		<?php else : ?>
 			<table class="widefat striped">
 				<thead>
