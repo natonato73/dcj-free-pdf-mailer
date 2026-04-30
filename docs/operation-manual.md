@@ -88,7 +88,33 @@ Paste it into:
 
 The frontend form also includes an optional newsletter opt-in checkbox. Users can receive the free PDF even if they do not check this box. If checked, the submission is recorded as opted in.
 
-## 7. Email Body Replacement Tags
+## 7. reCAPTCHA v3 Settings
+
+The free PDF form supports optional reCAPTCHA v3 spam protection.
+
+When reCAPTCHA v3 is enabled, the form submission is verified by Google before the plugin sends the email. If verification fails, the plugin does not send the email, save the submission log, or update the subscriber list.
+
+When reCAPTCHA is disabled, the form works as before.
+
+In **メール送信設定**, you can configure:
+
+- **reCAPTCHA v3を有効にする**: Enable or disable reCAPTCHA v3.
+- **Site Key**: The Site Key from Google reCAPTCHA.
+- **Secret Key**: The Secret Key from Google reCAPTCHA.
+- **Score Threshold**: The minimum score required to accept the submission.
+
+A practical starting threshold is `0.5`. If valid submissions fail, try lowering it to `0.3` and test again.
+
+To use this feature, create keys in the Google reCAPTCHA admin screen and choose **reCAPTCHA v3**. Register the real domain where the form is installed. LocalWP or a different local domain may not pass verification, so it is safer to test existing plugin functions locally with reCAPTCHA disabled and test reCAPTCHA on the production domain.
+
+Common setup issues:
+
+- The key was created for reCAPTCHA v2 instead of v3.
+- The Site Key or Secret Key was copied incorrectly.
+- The registered domain does not match the site where the form is installed.
+- The score threshold is too strict for normal visitors.
+
+## 8. Email Body Replacement Tags
 
 The email body can use replacement tags.
 
@@ -98,6 +124,7 @@ Available tags:
 {{title}}
 {{pdf_url}}
 {{terms_text}}
+{{unsubscribe_url}}
 ```
 
 Example:
@@ -110,9 +137,16 @@ You can download your PDF here:
 
 Terms:
 {{terms_text}}
+
+Unsubscribe:
+{{unsubscribe_url}}
 ```
 
-## 8. Editing an Existing PDF Setting
+`{{unsubscribe_url}}` is replaced with a token-protected unsubscribe URL when it is placed in the email body. If it is not included in the email body, no unsubscribe URL is sent.
+
+When a visitor clicks the unsubscribe URL, the subscriber status changes to `unsubscribed`. This does not prevent the visitor from receiving the requested free PDF. Japanese PDF settings show a Japanese completion screen, and English PDF settings show an English completion screen.
+
+## 9. Editing an Existing PDF Setting
 
 1. Open **DCJ Free PDF**.
 2. Find the target PDF setting in the list.
@@ -123,7 +157,7 @@ Terms:
 
 The management ID is shown as read-only in the edit form.
 
-## 9. Duplicating a PDF Setting
+## 10. Duplicating a PDF Setting
 
 Use duplicate when creating a similar PDF setting.
 
@@ -138,7 +172,7 @@ Use duplicate when creating a similar PDF setting.
 
 The duplicate action only fills the form. It does not save a new setting until **追加** is clicked.
 
-## 10. Deleting a PDF Setting
+## 11. Deleting a PDF Setting
 
 1. Open **DCJ Free PDF**.
 2. Find the target PDF setting.
@@ -147,7 +181,7 @@ The duplicate action only fills the form. It does not save a new setting until *
 
 Delete only settings that are no longer used. If a shortcode using that ID remains on a page, the form will no longer work for that shortcode.
 
-## 11. Reading Submission Logs
+## 12. Reading Submission Logs
 
 The **送信ログ** section shows recent send results.
 
@@ -167,13 +201,34 @@ If there are no submission logs, the clear logs button is not displayed. It appe
 
 Opt-in status is also included in CSV exports. Use this status carefully if sending future updates, product news, or marketing communications.
 
-## 12. CSV Export
+### Searching and Filtering Submission Logs
+
+The submission log area includes search and filter controls.
+
+Available controls:
+
+- Email address search
+- PDF management ID search
+- Newsletter opt-in filter
+  - All
+  - Opted in
+  - Not opted in
+
+The email and PDF ID searches match partial text. For example, searching for `gmail` can show log entries for email addresses that include `gmail`.
+
+The screen shows the total log count and the filtered result count. Use the clear link to reset the search conditions.
+
+The current search and filter controls narrow the currently displayed log range. CSV export keeps its existing behavior and is not changed by the current filters.
+
+## 13. CSV Export
 
 Click **送信ログをCSV出力** to download submission logs as a CSV file.
 
 The CSV includes email addresses and newsletter opt-in status. Treat exported files carefully, store them only where needed, and use opt-in status responsibly when planning future updates or promotional messages.
 
-## 13. Subscriber List
+CSV files may contain email addresses. Store downloaded CSV files carefully, delete unnecessary CSV files, and mask email addresses if sharing logs or CSV files externally.
+
+## 14. Subscriber List
 
 The **購読者リスト** section is separate from submission logs. Only users who checked the newsletter opt-in box are added to this list.
 
@@ -198,7 +253,36 @@ Admins can use **配信停止にする** to mark a subscriber as unsubscribed, o
 
 Click **購読者リストをCSV出力** to export the subscriber list as a CSV file. Use only subscribed contacts for future newsletters, coupons, or promotional emails. Do not send promotional emails to unsubscribed contacts.
 
-## 14. Troubleshooting
+### Searching and Filtering Subscribers
+
+The subscriber list includes search and filter controls.
+
+Available controls:
+
+- Email address search
+- Status filter
+  - All
+  - Subscribed
+  - Unsubscribed
+
+The screen shows the total subscriber count and the filtered result count. Use the clear link to reset the search conditions.
+
+The current search and filter controls narrow the currently displayed subscriber list range. CSV export keeps its existing behavior and is not changed by the current filters.
+
+### Deleting Individual Subscribers
+
+Individual subscribers can be deleted from the subscriber list.
+
+1. Open **DCJ Free PDF**.
+2. Find the email address in **購読者リスト**.
+3. Click **削除** in the action column.
+4. Confirm the browser confirmation dialog.
+
+Deleted subscribers cannot be restored. Export the subscriber CSV first if you may need a backup.
+
+Only the subscriber list entry is deleted. Submission logs are not deleted. This is useful for test data cleanup and incorrect registrations, but be careful not to delete real subscribers by mistake.
+
+## 15. Troubleshooting
 
 ### Email Does Not Arrive
 
@@ -237,6 +321,14 @@ Click **購読者リストをCSV出力** to export the subscriber list as a CSV 
 
 The plugin prevents repeated submissions from the same email address for a short period. Wait a few minutes and try again.
 
+### reCAPTCHA Verification Fails
+
+- Confirm that the Google reCAPTCHA key type is v3.
+- Check that the Site Key and Secret Key are correct.
+- Confirm that the registered domain matches the production site domain.
+- If testing on LocalWP or a different local domain, disable reCAPTCHA for local testing.
+- If valid submissions fail, lower the Score Threshold from `0.5` to `0.3` and test again.
+
 ### PDF URL Was Entered Incorrectly
 
 1. Edit the PDF setting.
@@ -244,13 +336,16 @@ The plugin prevents repeated submissions from the same email address for a short
 3. Save the setting.
 4. Test the shortcode form again.
 
-## 15. Production Operation Notes
+## 16. Production Operation Notes
 
 - Always open the PDF URL in a browser before publishing.
 - Send a test email after adding or editing a setting.
 - Consider SMTP configuration for production email delivery.
+- If using reCAPTCHA v3, create keys for the production domain and test form submission on that domain.
 - Delete unnecessary test settings after confirmation.
 - Keep management IDs stable after publishing shortcodes.
 - Keep backups before plugin updates.
+- Use only subscribed email addresses for future updates, product announcements, or coupons.
+- Do not send updates or promotional emails to unsubscribed contacts.
 - Treat email addresses, submission logs, and CSV exports as sensitive operational data.
 - Treat subscriber CSV exports carefully and exclude unsubscribed contacts from future promotional email use.
