@@ -357,6 +357,13 @@ class DCJ_Free_PDF_Mailer {
 		$pdf_url          = ! empty( $pdf_item['pdf_url'] ) ? esc_url_raw( $pdf_item['pdf_url'] ) : '';
 		$unsubscribe_lang = $this->get_pdf_item_language( $pdf_item, $pdf_id );
 		$unsubscribe_url  = DCJ_FPM_Unsubscribe::generate_url( $email, $unsubscribe_lang );
+		$newsletter_unsubscribe_block = '';
+
+		if ( 'yes' === $newsletter_optin ) {
+			$newsletter_unsubscribe_block = 'en' === $unsubscribe_lang
+				? "Unsubscribe from email updates:\n" . $unsubscribe_url
+				: "お知らせメールの配信停止はこちら：\n" . $unsubscribe_url;
+		}
 
 		// 置換用タグの準備
 		$search_tags = array(
@@ -369,6 +376,7 @@ class DCJ_Free_PDF_Mailer {
 			'{{kdp_title}}',
 			'{{kdp_url}}',
 			'{{unsubscribe_url}}',
+			'{{newsletter_unsubscribe_block}}',
 		);
 
 		$replace_values = array(
@@ -381,6 +389,7 @@ class DCJ_Free_PDF_Mailer {
 			! empty( $pdf_item['kdp_title'] ) ? $pdf_item['kdp_title'] : '',
 			! empty( $pdf_item['kdp_url'] ) ? esc_url_raw( $pdf_item['kdp_url'] ) : '',
 			$unsubscribe_url,
+			$newsletter_unsubscribe_block,
 		);
 
 		$body = str_replace( $search_tags, $replace_values, $body_template );
@@ -1198,7 +1207,7 @@ class DCJ_Free_PDF_Mailer {
 					dcj_title: 'サンプル塗り絵 無料PDF',
 					dcj_description: 'メールアドレスを入力すると、無料PDFのご案内をお送りします。',
 					dcj_mail_subject: '【Dream Coloring Journey】無料PDFダウンロードリンクのご案内',
-					dcj_mail_body: 'こんにちは。\n\n{{title}} にお申し込みいただき、ありがとうございます。\n\n以下のリンクからPDFをダウンロードできます。\n\n{{pdf_url}}\n\n利用条件：\n{{terms_text}}\n\n塗り絵の時間を楽しんでいただければ嬉しいです。\n\nDream Coloring Journey',
+					dcj_mail_body: 'こんにちは。\n\n{{title}} にお申し込みいただき、ありがとうございます。\n\n以下のリンクからPDFをダウンロードできます。\n\n{{pdf_url}}\n\n利用条件：\n{{terms_text}}\n\n{{newsletter_unsubscribe_block}}\n\n塗り絵の時間を楽しんでいただければ嬉しいです。\n\nDream Coloring Journey',
 					dcj_button_text: '送信する',
 					dcj_label_text: 'メールアドレス',
 					dcj_note_text: 'ご入力いただいたメールアドレスは、無料PDFのご案内に使用します。',
@@ -1211,7 +1220,7 @@ class DCJ_Free_PDF_Mailer {
 					dcj_title: 'Free Coloring PDF Sample',
 					dcj_description: 'Enter your email address to receive the free PDF download link.',
 					dcj_mail_subject: 'Your Free PDF Download Link from Dream Coloring Journey',
-					dcj_mail_body: 'Hello,\n\nThank you for requesting {{title}}.\n\nYou can download your PDF from the link below:\n\n{{pdf_url}}\n\nTerms of use:\n{{terms_text}}\n\nWe hope you enjoy your coloring time.\n\nDream Coloring Journey',
+					dcj_mail_body: 'Hello,\n\nThank you for requesting {{title}}.\n\nYou can download your PDF from the link below:\n\n{{pdf_url}}\n\nTerms of use:\n{{terms_text}}\n\n{{newsletter_unsubscribe_block}}\n\nWe hope you enjoy your coloring time.\n\nDream Coloring Journey',
 					dcj_button_text: 'Send',
 					dcj_label_text: 'Email address',
 					dcj_note_text: 'Your email address will be used to send this free PDF.',
@@ -2356,7 +2365,7 @@ class DCJ_Free_PDF_Mailer {
 	private function render_add_pdf_form() {
 
 		$nonce = wp_create_nonce( 'dcj_fpm_add_pdf_item' );
-		$default_mail_body = "こんにちは。\n\n{{title}} にお申し込みいただき、ありがとうございます。\n\n以下のリンクからPDFをダウンロードできます。\n\n{{pdf_url}}\n\n利用条件：\n{{terms_text}}\n\n塗り絵の時間を楽しんでいただければ嬉しいです。\n\nDream Coloring Journey";
+		$default_mail_body = "こんにちは。\n\n{{title}} にお申し込みいただき、ありがとうございます。\n\n以下のリンクからPDFをダウンロードできます。\n\n{{pdf_url}}\n\n利用条件：\n{{terms_text}}\n\n{{newsletter_unsubscribe_block}}\n\n塗り絵の時間を楽しんでいただければ嬉しいです。\n\nDream Coloring Journey";
 		$duplicate_source_id = '';
 		$duplicate_error     = '';
 		$add_values          = array(
@@ -2567,7 +2576,7 @@ class DCJ_Free_PDF_Mailer {
 					<th scope="row"><label for="dcj_mail_body"><?php echo esc_html( 'メール本文' ); ?> *</label></th>
 					<td>
 						<textarea id="dcj_mail_body" name="dcj_mail_body" rows="8" cols="50" required><?php echo esc_textarea( $add_values['mail_body'] ); ?></textarea>
-						<p class="description"><?php echo esc_html( '受信者に届くメール本文です。{{title}}、{{pdf_url}}、{{terms_text}}、{{unsubscribe_url}} などの置換タグが使えます。' ); ?></p>
+						<p class="description"><?php echo esc_html( '受信者に届くメール本文です。{{title}}、{{pdf_url}}、{{terms_text}}、{{unsubscribe_url}}、{{newsletter_unsubscribe_block}} などの置換タグが使えます。{{newsletter_unsubscribe_block}} はお知らせ受信に同意した場合だけ配信停止案内文に置換され、同意なしの場合は空欄になります。' ); ?></p>
 					</td>
 				</tr>
 				<tr>
@@ -2711,7 +2720,7 @@ class DCJ_Free_PDF_Mailer {
 			admin_url( 'admin.php' )
 		);
 		$edit_lang = ! empty( $pdf_item['lang'] ) ? $pdf_item['lang'] : 'ja';
-		$default_mail_body   = 'en' === $edit_lang ? "Hello,\n\nThank you for requesting {{title}}.\n\nYou can download your PDF from the link below:\n\n{{pdf_url}}\n\nTerms of use:\n{{terms_text}}\n\nWe hope you enjoy your coloring time.\n\nDream Coloring Journey" : "こんにちは。\n\n{{title}} にお申し込みいただき、ありがとうございます。\n\n以下のリンクからPDFをダウンロードできます。\n\n{{pdf_url}}\n\n利用条件：\n{{terms_text}}\n\n塗り絵の時間を楽しんでいただければ嬉しいです。\n\nDream Coloring Journey";
+		$default_mail_body   = 'en' === $edit_lang ? "Hello,\n\nThank you for requesting {{title}}.\n\nYou can download your PDF from the link below:\n\n{{pdf_url}}\n\nTerms of use:\n{{terms_text}}\n\n{{newsletter_unsubscribe_block}}\n\nWe hope you enjoy your coloring time.\n\nDream Coloring Journey" : "こんにちは。\n\n{{title}} にお申し込みいただき、ありがとうございます。\n\n以下のリンクからPDFをダウンロードできます。\n\n{{pdf_url}}\n\n利用条件：\n{{terms_text}}\n\n{{newsletter_unsubscribe_block}}\n\n塗り絵の時間を楽しんでいただければ嬉しいです。\n\nDream Coloring Journey";
 		$default_button_text = 'en' === $edit_lang ? 'Send' : '送信する';
 		$default_label_text  = 'en' === $edit_lang ? 'Email address' : 'メールアドレス';
 		$default_note_text   = 'en' === $edit_lang ? 'Your email address will be used to send this free PDF.' : 'ご入力いただいたメールアドレスは、無料PDFのご案内に使用します。';
@@ -2850,7 +2859,7 @@ class DCJ_Free_PDF_Mailer {
 					<th scope="row"><label for="dcj_edit_mail_body"><?php echo esc_html( 'メール本文' ); ?> *</label></th>
 					<td>
 						<textarea id="dcj_edit_mail_body" name="dcj_mail_body" rows="6" cols="50" required><?php echo esc_textarea( $mail_body ); ?></textarea>
-						<p class="description"><?php echo esc_html( '受信者に届くメール本文です。{{title}}、{{pdf_url}}、{{terms_text}}、{{unsubscribe_url}} などの置換タグが使えます。' ); ?></p>
+						<p class="description"><?php echo esc_html( '受信者に届くメール本文です。{{title}}、{{pdf_url}}、{{terms_text}}、{{unsubscribe_url}}、{{newsletter_unsubscribe_block}} などの置換タグが使えます。{{newsletter_unsubscribe_block}} はお知らせ受信に同意した場合だけ配信停止案内文に置換され、同意なしの場合は空欄になります。' ); ?></p>
 					</td>
 				</tr>
 				<tr>
@@ -3010,7 +3019,7 @@ class DCJ_Free_PDF_Mailer {
 		}
 
 		$preview_lang      = ! empty( $preview_pdf_item['lang'] ) ? $preview_pdf_item['lang'] : 'ja';
-		$default_mail_body = 'en' === $preview_lang ? "Hello,\n\nThank you for requesting {{title}}.\n\nYou can download your PDF from the link below:\n\n{{pdf_url}}\n\nTerms of use:\n{{terms_text}}\n\nWe hope you enjoy your coloring time.\n\nDream Coloring Journey" : "こんにちは。\n\n{{title}} にお申し込みいただき、ありがとうございます。\n\n以下のリンクからPDFをダウンロードできます。\n\n{{pdf_url}}\n\n利用条件：\n{{terms_text}}\n\n塗り絵の時間を楽しんでいただければ嬉しいです。\n\nDream Coloring Journey";
+		$default_mail_body = 'en' === $preview_lang ? "Hello,\n\nThank you for requesting {{title}}.\n\nYou can download your PDF from the link below:\n\n{{pdf_url}}\n\nTerms of use:\n{{terms_text}}\n\n{{newsletter_unsubscribe_block}}\n\nWe hope you enjoy your coloring time.\n\nDream Coloring Journey" : "こんにちは。\n\n{{title}} にお申し込みいただき、ありがとうございます。\n\n以下のリンクからPDFをダウンロードできます。\n\n{{pdf_url}}\n\n利用条件：\n{{terms_text}}\n\n{{newsletter_unsubscribe_block}}\n\n塗り絵の時間を楽しんでいただければ嬉しいです。\n\nDream Coloring Journey";
 		$preview_mail_body = ! empty( $preview_pdf_item['mail_body'] ) ? $preview_pdf_item['mail_body'] : $default_mail_body;
 
 		$this->output_styles();
