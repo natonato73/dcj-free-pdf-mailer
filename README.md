@@ -19,6 +19,7 @@ PDF settings are stored in WordPress options. The plugin does not create a custo
 - Switch default text between Japanese and English in the new item form.
 - Display a confirmation preview in the admin screen.
 - Send PDF download links by email.
+- Optional reCAPTCHA v3 spam protection for the free PDF form.
 - Add `{{unsubscribe_url}}` to email body text to include a token-protected unsubscribe URL.
 - Optional newsletter opt-in checkbox.
 - Prevent repeated submissions from the same email address for a short period.
@@ -77,6 +78,8 @@ The unsubscribe URL is included only when `{{unsubscribe_url}}` is placed in the
 
 CSV exports include email addresses, so store and share them carefully. The admin search and filter controls narrow the currently displayed list range; CSV exports keep their existing behavior.
 
+reCAPTCHA v3 is optional. To use it, create v3 keys in the Google reCAPTCHA admin screen, register the actual domain where the form is installed, and enter the Site Key, Secret Key, and score threshold in the plugin settings. A threshold of `0.5` is a practical starting point; if valid submissions fail, try a lower value such as `0.3`. When reCAPTCHA is disabled, the form works as before.
+
 ## Development Status
 
 Current status:
@@ -87,6 +90,7 @@ Current status:
 - Suggested ID generator is implemented.
 - Japanese/English default text switching is implemented.
 - Email sending is working.
+- Optional reCAPTCHA v3 verification is implemented.
 - Submission logging is implemented.
 - Submission log search/filtering is implemented.
 - Newsletter opt-in tracking is implemented.
