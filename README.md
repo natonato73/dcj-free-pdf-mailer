@@ -19,11 +19,14 @@ PDF settings are stored in WordPress options. The plugin does not create a custo
 - Switch default text between Japanese and English in the new item form.
 - Display a confirmation preview in the admin screen.
 - Send PDF download links by email.
+- Add `{{unsubscribe_url}}` to email body text to include a token-protected unsubscribe URL.
 - Optional newsletter opt-in checkbox.
 - Prevent repeated submissions from the same email address for a short period.
 - Save recent submission logs and display them in the admin screen.
+- Search and filter the submission log by email address, PDF management ID, and newsletter opt-in status.
 - Newsletter opt-in status in submission logs and CSV export.
 - Subscriber list management.
+- Search and filter subscribers by email address and status.
 - Subscriber CSV export.
 - Subscriber status management.
 - Mark subscribers as subscribed or unsubscribed.
@@ -70,6 +73,10 @@ Newsletter opt-in is optional. Use opt-in status for future updates, product new
 
 Use only active subscribed contacts for future newsletters or promotional emails. Do not send promotional emails to unsubscribed contacts.
 
+The unsubscribe URL is included only when `{{unsubscribe_url}}` is placed in the email body. Clicking that URL changes the subscriber status to unsubscribed, but it does not prevent the visitor from receiving the requested free PDF.
+
+CSV exports include email addresses, so store and share them carefully. The admin search and filter controls narrow the currently displayed list range; CSV exports keep their existing behavior.
+
 ## Development Status
 
 Current status:
@@ -81,9 +88,11 @@ Current status:
 - Japanese/English default text switching is implemented.
 - Email sending is working.
 - Submission logging is implemented.
+- Submission log search/filtering is implemented.
 - Newsletter opt-in tracking is implemented.
 - Subscriber list management is implemented.
 - Subscriber status management is implemented.
+- Subscriber search/filtering and unsubscribe URL handling are implemented.
 
 This plugin is still project-specific and should be reviewed before reuse on unrelated sites.
 
