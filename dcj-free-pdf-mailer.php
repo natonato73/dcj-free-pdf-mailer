@@ -16,6 +16,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-dcj-fpm-admin-notices.php';
+
 /**
  * DCJ Free PDF Mailer メインクラス
  *
@@ -1446,19 +1448,8 @@ class DCJ_Free_PDF_Mailer {
 		// フォーム送信処理
 		$this->handle_admin_form_submit();
 
-		// メッセージの取得・表示
-		$success_message = get_transient( 'dcj_fpm_admin_success' );
-		$error_message   = get_transient( 'dcj_fpm_admin_error' );
-
-		if ( $success_message ) {
-			echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $success_message ) . '</p></div>';
-			delete_transient( 'dcj_fpm_admin_success' );
-		}
-
-		if ( $error_message ) {
-			echo '<div class="notice notice-error is-dismissible"><p>' . esc_html( $error_message ) . '</p></div>';
-			delete_transient( 'dcj_fpm_admin_error' );
-		}
+		// メッセージの表示
+		DCJ_FPM_Admin_Notices::render();
 
 		// PDF設定を取得
 		$pdf_items = $this->get_pdf_items();
