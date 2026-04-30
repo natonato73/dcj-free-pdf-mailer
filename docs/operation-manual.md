@@ -29,6 +29,8 @@ Basic flow:
 
 After saving, confirm that the new item appears in the PDF settings list.
 
+New PDF settings include `{{newsletter_unsubscribe_block}}` in the default email body. Existing PDF settings are not updated automatically. To use this tag in an existing PDF setting, add `{{newsletter_unsubscribe_block}}` manually to the email body.
+
 ## 3. Management ID Rules
 
 Management IDs are used in shortcodes.
@@ -125,6 +127,7 @@ Available tags:
 {{pdf_url}}
 {{terms_text}}
 {{unsubscribe_url}}
+{{newsletter_unsubscribe_block}}
 ```
 
 Example:
@@ -138,11 +141,30 @@ You can download your PDF here:
 Terms:
 {{terms_text}}
 
-Unsubscribe:
-{{unsubscribe_url}}
+{{newsletter_unsubscribe_block}}
 ```
 
 `{{unsubscribe_url}}` is replaced with a token-protected unsubscribe URL when it is placed in the email body. If it is not included in the email body, no unsubscribe URL is sent.
+
+`{{newsletter_unsubscribe_block}}` is replaced with unsubscribe guidance only when the visitor opted in to email updates. If the visitor did not opt in, it becomes blank. For Japanese PDF settings, it shows Japanese unsubscribe guidance. For English PDF settings, it shows English unsubscribe guidance.
+
+English replacement example:
+
+```text
+Unsubscribe from email updates:
+https://...
+```
+
+Japanese replacement example:
+
+```text
+お知らせメールの配信停止はこちら：
+https://...
+```
+
+If a visitor only wants the free PDF and does not opt in to email updates, unsubscribe guidance is not shown when you use `{{newsletter_unsubscribe_block}}`. If a visitor opts in, the guidance can be shown in the email.
+
+If `{{unsubscribe_url}}` is placed directly in the email body, the URL is shown regardless of opt-in status. For normal operation, `{{newsletter_unsubscribe_block}}` is recommended because it appears only for opted-in visitors.
 
 When a visitor clicks the unsubscribe URL, the subscriber status changes to `unsubscribed`. This does not prevent the visitor from receiving the requested free PDF. Japanese PDF settings show a Japanese completion screen, and English PDF settings show an English completion screen.
 
@@ -218,13 +240,15 @@ The email and PDF ID searches match partial text. For example, searching for `gm
 
 The screen shows the total log count and the filtered result count. Use the clear link to reset the search conditions.
 
-The current search and filter controls narrow the currently displayed log range. CSV export keeps its existing behavior and is not changed by the current filters.
+The current search and filter controls narrow the currently displayed log range. The same search and filter conditions are also applied to the submission log CSV export.
 
 ## 13. CSV Export
 
 Click **送信ログをCSV出力** to download submission logs as a CSV file.
 
 The CSV includes email addresses and newsletter opt-in status. Treat exported files carefully, store them only where needed, and use opt-in status responsibly when planning future updates or promotional messages.
+
+Submission log CSV files are for checking form submission history and records. For future newsletters, product announcements, or coupons, use the subscriber CSV after filtering the subscriber status to subscribed.
 
 CSV files may contain email addresses. Store downloaded CSV files carefully, delete unnecessary CSV files, and mask email addresses if sharing logs or CSV files externally.
 
@@ -267,7 +291,7 @@ Available controls:
 
 The screen shows the total subscriber count and the filtered result count. Use the clear link to reset the search conditions.
 
-The current search and filter controls narrow the currently displayed subscriber list range. CSV export keeps its existing behavior and is not changed by the current filters.
+The current search and filter controls narrow the currently displayed subscriber list range. The same search and filter conditions are also applied to the subscriber CSV export.
 
 ### Deleting Individual Subscribers
 
@@ -282,7 +306,27 @@ Deleted subscribers cannot be restored. Export the subscriber CSV first if you m
 
 Only the subscriber list entry is deleted. Submission logs are not deleted. This is useful for test data cleanup and incorrect registrations, but be careful not to delete real subscribers by mistake.
 
-## 15. Troubleshooting
+## 15. File Structure And Distribution Zip
+
+The plugin is composed of the main plugin file and helper files under `includes/`.
+
+Required files:
+
+- `dcj-free-pdf-mailer.php`
+- `includes/class-dcj-fpm-admin-notices.php`
+- `includes/class-dcj-fpm-csv-exporter.php`
+- `includes/class-dcj-fpm-recaptcha.php`
+- `includes/class-dcj-fpm-unsubscribe.php`
+- `includes/class-dcj-fpm-subscriber-helper.php`
+- `includes/index.php`
+
+The `includes/` folder is required. If it is missing from the plugin zip, PHP errors or plugin failure may occur.
+
+Distribution zip files must include the `includes/` folder. Do not include development files such as `.git` or `.codex` in the distribution zip.
+
+This file split keeps the existing behavior while making the plugin easier to maintain.
+
+## 16. Troubleshooting
 
 ### Email Does Not Arrive
 
@@ -336,12 +380,20 @@ The plugin prevents repeated submissions from the same email address for a short
 3. Save the setting.
 4. Test the shortcode form again.
 
-## 16. Production Operation Notes
+## 17. Production Operation Notes
 
 - Always open the PDF URL in a browser before publishing.
 - Send a test email after adding or editing a setting.
 - Consider SMTP configuration for production email delivery.
 - If using reCAPTCHA v3, create keys for the production domain and test form submission on that domain.
+- Confirm that the admin screen opens after updating the plugin.
+- Confirm submission log CSV export.
+- Confirm subscriber CSV export.
+- Confirm reCAPTCHA when it is enabled.
+- Confirm the unsubscribe URL.
+- Confirm subscriber list display and filtering.
+- Confirm `{{newsletter_unsubscribe_block}}` behavior when needed.
+- Confirm that the update zip includes the `includes/` folder.
 - Delete unnecessary test settings after confirmation.
 - Keep management IDs stable after publishing shortcodes.
 - Keep backups before plugin updates.
