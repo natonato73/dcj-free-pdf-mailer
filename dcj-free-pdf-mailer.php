@@ -18,6 +18,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-dcj-fpm-admin-notices.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-dcj-fpm-csv-exporter.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-dcj-fpm-recaptcha.php';
 
 /**
  * DCJ Free PDF Mailer メインクラス
@@ -330,7 +331,7 @@ class DCJ_Free_PDF_Mailer {
 
 		$newsletter_optin = ! empty( $_POST['dcj_newsletter_optin'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['dcj_newsletter_optin'] ) ) ? 'yes' : 'no';
 
-		if ( ! $this->verify_recaptcha_submission() ) {
+		if ( ! DCJ_FPM_Recaptcha::verify_submission( $this->get_mail_settings() ) ) {
 			$recaptcha_lang    = $this->get_pdf_item_language( $pdf_item, $pdf_id );
 			$recaptcha_message = 'en' === $recaptcha_lang
 				? 'We could not verify your submission. Please try again later.'
@@ -811,73 +812,6 @@ class DCJ_Free_PDF_Mailer {
 	}
 
 	/**
-	 * reCAPTCHA v3が検証可能な設定か判定します。
-	 *
-	 * @param array $mail_settings メール送信設定
-	 * @return bool
-	 */
-	private function is_recaptcha_ready( $mail_settings ) {
-
-		return ! empty( $mail_settings['recaptcha_enabled'] )
-			&& ! empty( $mail_settings['recaptcha_site_key'] )
-			&& ! empty( $mail_settings['recaptcha_secret_key'] );
-	}
-
-	/**
-	 * reCAPTCHA v3送信を検証します。
-	 *
-	 * @return bool
-	 */
-	private function verify_recaptcha_submission() {
-
-		$mail_settings = $this->get_mail_settings();
-
-		if ( ! $this->is_recaptcha_ready( $mail_settings ) ) {
-			return true;
-		}
-
-		$token = ! empty( $_POST['dcj_recaptcha_token'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_recaptcha_token'] ) ) : '';
-
-		if ( empty( $token ) ) {
-			return false;
-		}
-
-		$body = array(
-			'secret'   => $mail_settings['recaptcha_secret_key'],
-			'response' => $token,
-		);
-
-		if ( ! empty( $_SERVER['REMOTE_ADDR'] ) ) {
-			$body['remoteip'] = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) );
-		}
-
-		$response = wp_remote_post(
-			'https://www.google.com/recaptcha/api/siteverify',
-			array(
-				'timeout' => 8,
-				'body'    => $body,
-			)
-		);
-
-		if ( is_wp_error( $response ) ) {
-			return false;
-		}
-
-		$result = json_decode( wp_remote_retrieve_body( $response ), true );
-
-		if ( ! is_array( $result ) ) {
-			return false;
-		}
-
-		$success   = ! empty( $result['success'] );
-		$score     = isset( $result['score'] ) ? (float) $result['score'] : 0;
-		$action    = ! empty( $result['action'] ) ? sanitize_key( $result['action'] ) : '';
-		$threshold = (float) $mail_settings['recaptcha_threshold'];
-
-		return $success && $score >= $threshold && 'dcj_free_pdf_submit' === $action;
-	}
-
-	/**
 	 * ショートコードからフォームを表示します。
 	 *
 	 * 使用例：
@@ -964,7 +898,7 @@ class DCJ_Free_PDF_Mailer {
 			? 'チェックしなくても無料PDFはお受け取りいただけます。お知らせやクーポンは不定期でお送りします。'
 			: 'You can receive the free PDF even if you do not check this box. Updates and coupons are sent occasionally.';
 		$mail_settings      = $this->get_mail_settings();
-		$recaptcha_enabled  = $this->is_recaptcha_ready( $mail_settings );
+		$recaptcha_enabled  = DCJ_FPM_Recaptcha::is_ready( $mail_settings );
 		$form_id            = self::CSS_PREFIX . 'form-' . $pdf_id;
 		$recaptcha_input_id = self::CSS_PREFIX . 'recaptcha-token-' . $pdf_id;
 
