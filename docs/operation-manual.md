@@ -90,7 +90,34 @@ Paste it into:
 
 The frontend form also includes an optional newsletter opt-in checkbox. Users can receive the free PDF even if they do not check this box. If checked, the submission is recorded as opted in.
 
-## 7. reCAPTCHA v3 Settings
+## 7. Mail Diagnostics
+
+The admin screen includes **メール送信診断** for basic mail delivery troubleshooting.
+
+This panel shows:
+
+- Site URL
+- Site domain
+- WordPress admin email address
+- Current sender name
+- Current sender email address
+- Sender email domain
+
+How to read the check result:
+
+- If the sender email address is empty, a warning is shown.
+- If the sender email address format is invalid, a warning is shown.
+- If the site domain and sender email domain are different, a notice is shown.
+- If the WordPress admin email and sender email are different, reference information is shown.
+- If no major basic setting issue is found, an OK message is shown.
+
+To send a test email, enter a test recipient email address and click **テストメールを送信**. The test email uses WordPress `wp_mail()` and the sender name and sender email address from the existing mail settings.
+
+If sending succeeds, a success message is shown in the admin screen. If sending fails, an error message is shown.
+
+This is a basic check for mail delivery issues. It does not guarantee mail delivery. You may still need SMTP settings and SPF / DKIM / DMARC checks. Gmail and other providers may still show server-based sender notices or place messages in spam depending on the server, DNS, SMTP, and recipient mail environment.
+
+## 8. reCAPTCHA v3 Settings
 
 The free PDF form supports optional reCAPTCHA v3 spam protection.
 
@@ -116,7 +143,7 @@ Common setup issues:
 - The registered domain does not match the site where the form is installed.
 - The score threshold is too strict for normal visitors.
 
-## 8. Email Body Replacement Tags
+## 9. Email Body Replacement Tags
 
 The email body can use replacement tags.
 
@@ -168,7 +195,7 @@ If `{{unsubscribe_url}}` is placed directly in the email body, the URL is shown 
 
 When a visitor clicks the unsubscribe URL, the subscriber status changes to `unsubscribed`. This does not prevent the visitor from receiving the requested free PDF. Japanese PDF settings show a Japanese completion screen, and English PDF settings show an English completion screen.
 
-## 9. Editing an Existing PDF Setting
+## 10. Editing an Existing PDF Setting
 
 1. Open **DCJ Free PDF**.
 2. Find the target PDF setting in the list.
@@ -179,7 +206,7 @@ When a visitor clicks the unsubscribe URL, the subscriber status changes to `uns
 
 The management ID is shown as read-only in the edit form.
 
-## 10. Duplicating a PDF Setting
+## 11. Duplicating a PDF Setting
 
 Use duplicate when creating a similar PDF setting.
 
@@ -194,7 +221,7 @@ Use duplicate when creating a similar PDF setting.
 
 The duplicate action only fills the form. It does not save a new setting until **追加** is clicked.
 
-## 11. Deleting a PDF Setting
+## 12. Deleting a PDF Setting
 
 1. Open **DCJ Free PDF**.
 2. Find the target PDF setting.
@@ -203,7 +230,7 @@ The duplicate action only fills the form. It does not save a new setting until *
 
 Delete only settings that are no longer used. If a shortcode using that ID remains on a page, the form will no longer work for that shortcode.
 
-## 12. Reading Submission Logs
+## 13. Reading Submission Logs
 
 The **送信ログ** section shows recent send results.
 
@@ -242,7 +269,7 @@ The screen shows the total log count and the filtered result count. Use the clea
 
 The current search and filter controls narrow the currently displayed log range. The same search and filter conditions are also applied to the submission log CSV export.
 
-## 13. CSV Export
+## 14. CSV Export
 
 Click **送信ログをCSV出力** to download submission logs as a CSV file.
 
@@ -252,7 +279,7 @@ Submission log CSV files are for checking form submission history and records. F
 
 CSV files may contain email addresses. Store downloaded CSV files carefully, delete unnecessary CSV files, and mask email addresses if sharing logs or CSV files externally.
 
-## 14. Subscriber List
+## 15. Subscriber List
 
 The **購読者リスト** section is separate from submission logs. Only users who checked the newsletter opt-in box are added to this list.
 
@@ -306,7 +333,7 @@ Deleted subscribers cannot be restored. Export the subscriber CSV first if you m
 
 Only the subscriber list entry is deleted. Submission logs are not deleted. This is useful for test data cleanup and incorrect registrations, but be careful not to delete real subscribers by mistake.
 
-## 15. File Structure And Distribution Zip
+## 16. File Structure And Distribution Zip
 
 The plugin is composed of the main plugin file and helper files under `includes/`.
 
@@ -326,7 +353,7 @@ Distribution zip files must include the `includes/` folder. Do not include devel
 
 This file split keeps the existing behavior while making the plugin easier to maintain.
 
-## 16. Troubleshooting
+## 17. Troubleshooting
 
 ### Email Does Not Arrive
 
@@ -380,11 +407,12 @@ The plugin prevents repeated submissions from the same email address for a short
 3. Save the setting.
 4. Test the shortcode form again.
 
-## 17. Production Operation Notes
+## 18. Production Operation Notes
 
 - Always open the PDF URL in a browser before publishing.
 - Send a test email after adding or editing a setting.
 - Consider SMTP configuration for production email delivery.
+- Confirm the mail diagnostics panel, domain check, and test email sending.
 - If using reCAPTCHA v3, create keys for the production domain and test form submission on that domain.
 - Confirm that the admin screen opens after updating the plugin.
 - Confirm submission log CSV export.

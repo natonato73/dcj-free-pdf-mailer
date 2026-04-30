@@ -19,6 +19,9 @@ PDF settings are stored in WordPress options. The plugin does not create a custo
 - Switch default text between Japanese and English in the new item form.
 - Display a confirmation preview in the admin screen.
 - Send PDF download links by email.
+- Mail diagnostics panel in the admin screen.
+- Basic check between the site domain and the sender email domain.
+- Send a test email from the admin screen.
 - Optional reCAPTCHA v3 spam protection for the free PDF form.
 - Add `{{unsubscribe_url}}` to email body text to include a token-protected unsubscribe URL.
 - Add `{{newsletter_unsubscribe_block}}` to show unsubscribe guidance only when the visitor opted in to email updates.
@@ -80,6 +83,8 @@ PDF files uploaded through the standard WordPress Media Library are usually suit
 This plugin uses WordPress mail sending through `wp_mail()`. Delivery depends on the hosting environment, mail settings, and recipient mail provider.
 
 If a recipient cannot find the email, they should check spam, junk, or promotions folders. For more reliable delivery, configure WordPress to send mail through an authenticated SMTP service.
+
+The admin screen includes a basic mail diagnostics panel. It shows the site URL, site domain, WordPress admin email address, sender name, sender email address, and sender email domain. It can also send a test email using `wp_mail()` and the configured sender settings. This is only a basic check and does not guarantee mail delivery. SMTP settings and SPF / DKIM / DMARC checks may still be needed.
 
 Newsletter opt-in is optional. Use opt-in status for future updates, product news, or marketing communications only when consent has been obtained, and handle exported email/log data carefully.
 
