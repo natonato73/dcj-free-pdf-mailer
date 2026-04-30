@@ -634,6 +634,60 @@ class DCJ_Free_PDF_Mailer {
 	}
 
 	/**
+	 * 送信ログ検索条件を取得します。
+	 *
+	 * @return array
+	 */
+	private function get_submission_log_filters_from_request() {
+
+		$newsletter_consent = ! empty( $_GET['dcj_log_newsletter_consent'] ) ? sanitize_key( wp_unslash( $_GET['dcj_log_newsletter_consent'] ) ) : 'all';
+		$newsletter_consent = in_array( $newsletter_consent, array( 'all', 'yes', 'no' ), true ) ? $newsletter_consent : 'all';
+
+		return array(
+			'email_search'       => ! empty( $_GET['dcj_log_email_search'] ) ? sanitize_text_field( wp_unslash( $_GET['dcj_log_email_search'] ) ) : '',
+			'pdf_id_search'      => ! empty( $_GET['dcj_log_pdf_id_search'] ) ? sanitize_text_field( wp_unslash( $_GET['dcj_log_pdf_id_search'] ) ) : '',
+			'newsletter_consent' => $newsletter_consent,
+		);
+	}
+
+	/**
+	 * 送信ログを検索条件で絞り込みます。
+	 *
+	 * @param array $logs 送信ログ
+	 * @param array $filters 検索条件
+	 * @return array
+	 */
+	private function filter_submission_logs( $logs, $filters ) {
+
+		if ( empty( $filters['email_search'] ) && empty( $filters['pdf_id_search'] ) && ( empty( $filters['newsletter_consent'] ) || 'all' === $filters['newsletter_consent'] ) ) {
+			return $logs;
+		}
+
+		return array_filter(
+			$logs,
+			function ( $log ) use ( $filters ) {
+				$email              = ! empty( $log['email'] ) ? sanitize_email( $log['email'] ) : '';
+				$pdf_id             = ! empty( $log['pdf_id'] ) ? sanitize_text_field( $log['pdf_id'] ) : '';
+				$newsletter_consent = ! empty( $log['newsletter_optin'] ) && 'yes' === $log['newsletter_optin'] ? 'yes' : 'no';
+
+				if ( ! empty( $filters['email_search'] ) && false === stripos( $email, $filters['email_search'] ) ) {
+					return false;
+				}
+
+				if ( ! empty( $filters['pdf_id_search'] ) && false === stripos( $pdf_id, $filters['pdf_id_search'] ) ) {
+					return false;
+				}
+
+				if ( ! empty( $filters['newsletter_consent'] ) && 'all' !== $filters['newsletter_consent'] && $newsletter_consent !== $filters['newsletter_consent'] ) {
+					return false;
+				}
+
+				return true;
+			}
+		);
+	}
+
+	/**
 	 * 購読者リストを取得します。
 	 *
 	 * @param int $limit 取得件数。0の場合は全件
@@ -663,6 +717,54 @@ class DCJ_Free_PDF_Mailer {
 		}
 
 		return array_slice( $subscribers, 0, absint( $limit ) );
+	}
+
+	/**
+	 * 購読者検索条件を取得します。
+	 *
+	 * @return array
+	 */
+	private function get_subscriber_filters_from_request() {
+
+		$status = ! empty( $_GET['dcj_subscriber_status'] ) ? sanitize_key( wp_unslash( $_GET['dcj_subscriber_status'] ) ) : 'all';
+		$status = in_array( $status, array( 'all', 'subscribed', 'unsubscribed' ), true ) ? $status : 'all';
+
+		return array(
+			'search' => ! empty( $_GET['dcj_subscriber_search'] ) ? sanitize_text_field( wp_unslash( $_GET['dcj_subscriber_search'] ) ) : '',
+			'status' => $status,
+		);
+	}
+
+	/**
+	 * 購読者を検索条件で絞り込みます。
+	 *
+	 * @param array $subscribers 購読者リスト
+	 * @param array $filters 検索条件
+	 * @return array
+	 */
+	private function filter_subscribers( $subscribers, $filters ) {
+
+		if ( empty( $filters['search'] ) && ( empty( $filters['status'] ) || 'all' === $filters['status'] ) ) {
+			return $subscribers;
+		}
+
+		return array_filter(
+			$subscribers,
+			function ( $subscriber ) use ( $filters ) {
+				$email  = ! empty( $subscriber['email'] ) ? sanitize_email( $subscriber['email'] ) : '';
+				$status = ! empty( $subscriber['status'] ) && 'unsubscribed' === $subscriber['status'] ? 'unsubscribed' : 'subscribed';
+
+				if ( ! empty( $filters['search'] ) && false === stripos( $email, $filters['search'] ) ) {
+					return false;
+				}
+
+				if ( ! empty( $filters['status'] ) && 'all' !== $filters['status'] && $status !== $filters['status'] ) {
+					return false;
+				}
+
+				return true;
+			}
+		);
 	}
 
 	/**
@@ -1785,6 +1887,7 @@ class DCJ_Free_PDF_Mailer {
 
 		$logs      = get_option( self::OPTION_SUBMISSION_LOGS, array() );
 		$logs      = is_array( $logs ) ? $logs : array();
+		$logs      = $this->filter_submission_logs( $logs, $this->get_submission_log_filters_from_request() );
 		$timestamp = date_i18n( 'Ymd-His', current_time( 'timestamp' ) );
 		$filename  = 'dcj-free-pdf-submission-logs-' . $timestamp . '.csv';
 
@@ -1849,6 +1952,9 @@ class DCJ_Free_PDF_Mailer {
 
 		$logs        = get_option( self::OPTION_SUBMISSION_LOGS, array() );
 		$logs        = is_array( $logs ) ? $logs : array();
+		$log_filters = $this->get_submission_log_filters_from_request();
+		$log_filters['newsletter_consent'] = 'all';
+		$logs        = $this->filter_submission_logs( $logs, $log_filters );
 		$seen_emails = array();
 		$subscribers = array();
 
@@ -1929,7 +2035,7 @@ class DCJ_Free_PDF_Mailer {
 			wp_die( esc_html( 'CSV出力の確認に失敗しました。' ) );
 		}
 
-		$subscribers = $this->get_subscribers( 0 );
+		$subscribers = $this->filter_subscribers( $this->get_subscribers( 0 ), $this->get_subscriber_filters_from_request() );
 		$timestamp   = date_i18n( 'Ymd-His', current_time( 'timestamp' ) );
 		$filename    = 'dcj-free-pdf-subscribers-' . $timestamp . '.csv';
 
@@ -2130,36 +2236,12 @@ class DCJ_Free_PDF_Mailer {
 	private function render_submission_logs() {
 
 		$logs                          = $this->get_submission_logs( 50 );
-		$log_email_search              = ! empty( $_GET['dcj_log_email_search'] ) ? sanitize_text_field( wp_unslash( $_GET['dcj_log_email_search'] ) ) : '';
-		$log_pdf_id_search             = ! empty( $_GET['dcj_log_pdf_id_search'] ) ? sanitize_text_field( wp_unslash( $_GET['dcj_log_pdf_id_search'] ) ) : '';
-		$log_newsletter_consent_filter = ! empty( $_GET['dcj_log_newsletter_consent'] ) ? sanitize_key( wp_unslash( $_GET['dcj_log_newsletter_consent'] ) ) : 'all';
-		$log_newsletter_consent_filter = in_array( $log_newsletter_consent_filter, array( 'all', 'yes', 'no' ), true ) ? $log_newsletter_consent_filter : 'all';
+		$log_filters                   = $this->get_submission_log_filters_from_request();
+		$log_email_search              = $log_filters['email_search'];
+		$log_pdf_id_search             = $log_filters['pdf_id_search'];
+		$log_newsletter_consent_filter = $log_filters['newsletter_consent'];
 		$total_log_count               = count( $logs );
-
-		if ( '' !== $log_email_search || '' !== $log_pdf_id_search || 'all' !== $log_newsletter_consent_filter ) {
-			$logs = array_filter(
-				$logs,
-				function ( $log ) use ( $log_email_search, $log_pdf_id_search, $log_newsletter_consent_filter ) {
-					$email              = ! empty( $log['email'] ) ? sanitize_email( $log['email'] ) : '';
-					$pdf_id             = ! empty( $log['pdf_id'] ) ? sanitize_text_field( $log['pdf_id'] ) : '';
-					$newsletter_consent = ! empty( $log['newsletter_optin'] ) && 'yes' === $log['newsletter_optin'] ? 'yes' : 'no';
-
-					if ( '' !== $log_email_search && false === stripos( $email, $log_email_search ) ) {
-						return false;
-					}
-
-					if ( '' !== $log_pdf_id_search && false === stripos( $pdf_id, $log_pdf_id_search ) ) {
-						return false;
-					}
-
-					if ( 'all' !== $log_newsletter_consent_filter && $newsletter_consent !== $log_newsletter_consent_filter ) {
-						return false;
-					}
-
-					return true;
-				}
-			);
-		}
+		$logs                          = $this->filter_submission_logs( $logs, $log_filters );
 
 		$filtered_log_count = count( $logs );
 		$clear_search_url   = add_query_arg(
@@ -2168,27 +2250,17 @@ class DCJ_Free_PDF_Mailer {
 			),
 			admin_url( 'admin.php' )
 		);
+		$log_export_args    = array(
+			'page'                       => self::PLUGIN_SLUG,
+			'dcj_fpm_action'             => 'export_logs',
+			'dcj_log_email_search'       => $log_email_search,
+			'dcj_log_pdf_id_search'      => $log_pdf_id_search,
+			'dcj_log_newsletter_consent' => $log_newsletter_consent_filter,
+		);
 		$export_url         = wp_nonce_url(
-			add_query_arg(
-				array(
-					'page'           => self::PLUGIN_SLUG,
-					'dcj_fpm_action' => 'export_logs',
-				),
-				admin_url( 'admin.php' )
-			),
+			add_query_arg( $log_export_args, admin_url( 'admin.php' ) ),
 			'dcj_fpm_export_logs',
 			'dcj_fpm_export_logs_nonce'
-		);
-		$optin_export_url = wp_nonce_url(
-			add_query_arg(
-				array(
-					'page'           => self::PLUGIN_SLUG,
-					'dcj_fpm_action' => 'export_optin_subscribers',
-				),
-				admin_url( 'admin.php' )
-			),
-			'dcj_fpm_export_optin_subscribers',
-			'dcj_fpm_export_optin_subscribers_nonce'
 		);
 		$clear_url        = wp_nonce_url(
 			add_query_arg(
@@ -2206,11 +2278,12 @@ class DCJ_Free_PDF_Mailer {
 		<h2><?php echo esc_html( '送信ログ' ); ?></h2>
 		<p>
 			<a class="button" href="<?php echo esc_url( $export_url ); ?>"><?php echo esc_html( '送信ログをCSV出力' ); ?></a>
-			<a class="button" href="<?php echo esc_url( $optin_export_url ); ?>"><?php echo esc_html( '同意ありメールをCSV出力' ); ?></a>
 			<?php if ( 0 < $total_log_count ) : ?>
 				<a class="button" href="<?php echo esc_url( $clear_url ); ?>" onclick="return confirm('<?php echo esc_attr( '送信ログをすべて削除します。元に戻せません。よろしいですか？' ); ?>');"><?php echo esc_html( '送信ログをすべて削除' ); ?></a>
 			<?php endif; ?>
 		</p>
+		<p><?php echo esc_html( '送信ログCSVは、フォーム送信履歴の確認用です。お知らせ配信・販売案内・クーポン案内に使うメールアドレスは、購読者リストで「購読中」に絞り込んでCSV出力してください。' ); ?></p>
+		<p><?php echo esc_html( '現在の検索・絞り込み条件はCSV出力にも反映されます。' ); ?></p>
 		<form method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" style="margin: 1em 0;">
 			<input type="hidden" name="page" value="<?php echo esc_attr( self::PLUGIN_SLUG ); ?>">
 			<label for="dcj-log-email-search"><?php echo esc_html( 'メールアドレス検索' ); ?></label>
@@ -2270,30 +2343,11 @@ class DCJ_Free_PDF_Mailer {
 	private function render_subscribers() {
 
 		$subscribers              = $this->get_subscribers( 50 );
-		$subscriber_search        = ! empty( $_GET['dcj_subscriber_search'] ) ? sanitize_text_field( wp_unslash( $_GET['dcj_subscriber_search'] ) ) : '';
-		$subscriber_status_filter = ! empty( $_GET['dcj_subscriber_status'] ) ? sanitize_key( wp_unslash( $_GET['dcj_subscriber_status'] ) ) : 'all';
-		$subscriber_status_filter = in_array( $subscriber_status_filter, array( 'all', 'subscribed', 'unsubscribed' ), true ) ? $subscriber_status_filter : 'all';
+		$subscriber_filters       = $this->get_subscriber_filters_from_request();
+		$subscriber_search        = $subscriber_filters['search'];
+		$subscriber_status_filter = $subscriber_filters['status'];
 		$total_subscriber_count   = count( $subscribers );
-
-		if ( '' !== $subscriber_search || 'all' !== $subscriber_status_filter ) {
-			$subscribers = array_filter(
-				$subscribers,
-				function ( $subscriber ) use ( $subscriber_search, $subscriber_status_filter ) {
-					$email  = ! empty( $subscriber['email'] ) ? sanitize_email( $subscriber['email'] ) : '';
-					$status = ! empty( $subscriber['status'] ) && 'unsubscribed' === $subscriber['status'] ? 'unsubscribed' : 'subscribed';
-
-					if ( '' !== $subscriber_search && false === stripos( $email, $subscriber_search ) ) {
-						return false;
-					}
-
-					if ( 'all' !== $subscriber_status_filter && $status !== $subscriber_status_filter ) {
-						return false;
-					}
-
-					return true;
-				}
-			);
-		}
+		$subscribers              = $this->filter_subscribers( $subscribers, $subscriber_filters );
 
 		$filtered_subscriber_count = count( $subscribers );
 		$clear_url                 = add_query_arg(
@@ -2305,8 +2359,10 @@ class DCJ_Free_PDF_Mailer {
 		$export_url                = wp_nonce_url(
 			add_query_arg(
 				array(
-					'page'           => self::PLUGIN_SLUG,
-					'dcj_fpm_action' => 'export_subscribers',
+					'page'                  => self::PLUGIN_SLUG,
+					'dcj_fpm_action'        => 'export_subscribers',
+					'dcj_subscriber_search' => $subscriber_search,
+					'dcj_subscriber_status' => $subscriber_status_filter,
 				),
 				admin_url( 'admin.php' )
 			),
@@ -2319,6 +2375,8 @@ class DCJ_Free_PDF_Mailer {
 		<p>
 			<a class="button" href="<?php echo esc_url( $export_url ); ?>"><?php echo esc_html( '購読者リストをCSV出力' ); ?></a>
 		</p>
+		<p><?php echo esc_html( '現在の検索・絞り込み条件はCSV出力にも反映されます。' ); ?></p>
+		<p><?php echo esc_html( 'お知らせ配信・販売案内・クーポン案内に使う場合は、ステータスを「購読中」に絞り込んでCSV出力してください。' ); ?></p>
 		<p><?php echo esc_html( '削除前に必要に応じて購読者CSVを出力してください。削除した購読者は元に戻せません。' ); ?></p>
 		<form method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" style="margin: 1em 0;">
 			<input type="hidden" name="page" value="<?php echo esc_attr( self::PLUGIN_SLUG ); ?>">
