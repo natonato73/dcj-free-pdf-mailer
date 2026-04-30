@@ -2005,8 +2005,40 @@ class DCJ_Free_PDF_Mailer {
 	 */
 	private function render_subscribers() {
 
-		$subscribers = $this->get_subscribers( 50 );
-		$export_url  = wp_nonce_url(
+		$subscribers              = $this->get_subscribers( 50 );
+		$subscriber_search        = ! empty( $_GET['dcj_subscriber_search'] ) ? sanitize_text_field( wp_unslash( $_GET['dcj_subscriber_search'] ) ) : '';
+		$subscriber_status_filter = ! empty( $_GET['dcj_subscriber_status'] ) ? sanitize_key( wp_unslash( $_GET['dcj_subscriber_status'] ) ) : 'all';
+		$subscriber_status_filter = in_array( $subscriber_status_filter, array( 'all', 'subscribed', 'unsubscribed' ), true ) ? $subscriber_status_filter : 'all';
+		$total_subscriber_count   = count( $subscribers );
+
+		if ( '' !== $subscriber_search || 'all' !== $subscriber_status_filter ) {
+			$subscribers = array_filter(
+				$subscribers,
+				function ( $subscriber ) use ( $subscriber_search, $subscriber_status_filter ) {
+					$email  = ! empty( $subscriber['email'] ) ? sanitize_email( $subscriber['email'] ) : '';
+					$status = ! empty( $subscriber['status'] ) && 'unsubscribed' === $subscriber['status'] ? 'unsubscribed' : 'subscribed';
+
+					if ( '' !== $subscriber_search && false === stripos( $email, $subscriber_search ) ) {
+						return false;
+					}
+
+					if ( 'all' !== $subscriber_status_filter && $status !== $subscriber_status_filter ) {
+						return false;
+					}
+
+					return true;
+				}
+			);
+		}
+
+		$filtered_subscriber_count = count( $subscribers );
+		$clear_url                 = add_query_arg(
+			array(
+				'page' => self::PLUGIN_SLUG,
+			),
+			admin_url( 'admin.php' )
+		);
+		$export_url                = wp_nonce_url(
 			add_query_arg(
 				array(
 					'page'           => self::PLUGIN_SLUG,
@@ -2023,8 +2055,25 @@ class DCJ_Free_PDF_Mailer {
 		<p>
 			<a class="button" href="<?php echo esc_url( $export_url ); ?>"><?php echo esc_html( '購読者リストをCSV出力' ); ?></a>
 		</p>
+		<form method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" style="margin: 1em 0;">
+			<input type="hidden" name="page" value="<?php echo esc_attr( self::PLUGIN_SLUG ); ?>">
+			<label for="dcj-subscriber-search"><?php echo esc_html( 'メールアドレス検索' ); ?></label>
+			<input type="text" id="dcj-subscriber-search" name="dcj_subscriber_search" value="<?php echo esc_attr( $subscriber_search ); ?>">
+			<label for="dcj-subscriber-status"><?php echo esc_html( 'ステータス' ); ?></label>
+			<select id="dcj-subscriber-status" name="dcj_subscriber_status">
+				<option value="all" <?php selected( $subscriber_status_filter, 'all' ); ?>><?php echo esc_html( 'すべて' ); ?></option>
+				<option value="subscribed" <?php selected( $subscriber_status_filter, 'subscribed' ); ?>><?php echo esc_html( '購読中' ); ?></option>
+				<option value="unsubscribed" <?php selected( $subscriber_status_filter, 'unsubscribed' ); ?>><?php echo esc_html( '配信停止' ); ?></option>
+			</select>
+			<button type="submit" class="button"><?php echo esc_html( '検索' ); ?></button>
+			<a href="<?php echo esc_url( $clear_url ); ?>"><?php echo esc_html( 'クリア' ); ?></a>
+		</form>
+		<p>
+			<?php echo esc_html( '購読者一覧：' . $total_subscriber_count . '件' ); ?><br>
+			<?php echo esc_html( '絞り込み結果：' . $filtered_subscriber_count . '件' ); ?>
+		</p>
 		<?php if ( empty( $subscribers ) ) : ?>
-			<p><?php echo esc_html( 'まだ購読者はありません。' ); ?></p>
+			<p><?php echo esc_html( 0 === $total_subscriber_count ? 'まだ購読者はありません。' : '条件に一致する購読者はありません。' ); ?></p>
 		<?php else : ?>
 			<table class="widefat striped">
 				<thead>
