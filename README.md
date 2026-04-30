@@ -21,6 +21,7 @@ PDF settings are stored in WordPress options. The plugin does not create a custo
 - Send PDF download links by email.
 - Optional reCAPTCHA v3 spam protection for the free PDF form.
 - Add `{{unsubscribe_url}}` to email body text to include a token-protected unsubscribe URL.
+- Add `{{newsletter_unsubscribe_block}}` to show unsubscribe guidance only when the visitor opted in to email updates.
 - Optional newsletter opt-in checkbox.
 - Prevent repeated submissions from the same email address for a short period.
 - Save recent submission logs and display them in the admin screen.
@@ -76,7 +77,9 @@ Newsletter opt-in is optional. Use opt-in status for future updates, product new
 
 Use only active subscribed contacts for future newsletters or promotional emails. Do not send promotional emails to unsubscribed contacts.
 
-The unsubscribe URL is included only when `{{unsubscribe_url}}` is placed in the email body. Clicking that URL changes the subscriber status to unsubscribed, but it does not prevent the visitor from receiving the requested free PDF.
+The unsubscribe URL is included when `{{unsubscribe_url}}` is placed in the email body. For regular operation, `{{newsletter_unsubscribe_block}}` is usually more natural because it shows unsubscribe guidance only when the visitor opted in to email updates. Existing PDF settings are not updated automatically; add the tag manually if you want to use it in an existing email body.
+
+Clicking an unsubscribe URL changes the subscriber status to unsubscribed, but it does not prevent the visitor from receiving the requested free PDF.
 
 CSV exports include email addresses, so store and share them carefully. Submission log CSV files are for checking form submission history and records. For future newsletters, product announcements, or coupons, export the subscriber list after filtering the status to subscribed.
 
