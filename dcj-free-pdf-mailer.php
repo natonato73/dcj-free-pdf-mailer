@@ -66,6 +66,7 @@ class DCJ_Free_PDF_Mailer {
 		add_action( 'admin_init', array( $this, 'handle_admin_export_optin_subscribers' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_export_subscribers' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_update_subscriber_status' ) );
+		add_action( 'admin_init', array( $this, 'handle_admin_delete_subscriber' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_clear_logs' ) );
 
 		// 管理画面のメディアライブラリ選択
@@ -2028,6 +2029,58 @@ class DCJ_Free_PDF_Mailer {
 	}
 
 	/**
+	 * 購読者を削除します。
+	 */
+	public function handle_admin_delete_subscriber() {
+
+		if ( empty( $_GET['page'] ) || self::PLUGIN_SLUG !== sanitize_key( wp_unslash( $_GET['page'] ) ) ) {
+			return;
+		}
+
+		if ( empty( $_GET['dcj_fpm_delete_subscriber'] ) || '1' !== sanitize_text_field( wp_unslash( $_GET['dcj_fpm_delete_subscriber'] ) ) ) {
+			return;
+		}
+
+		$redirect_url = add_query_arg(
+			array(
+				'page' => self::PLUGIN_SLUG,
+			),
+			admin_url( 'admin.php' )
+		);
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'dcj-free-pdf-mailer' ) );
+		}
+
+		$email = ! empty( $_GET['subscriber_email'] ) ? strtolower( sanitize_email( wp_unslash( $_GET['subscriber_email'] ) ) ) : '';
+
+		if ( empty( $email ) || ! is_email( $email ) ) {
+			set_transient( 'dcj_fpm_admin_error', '削除対象の購読者を確認できませんでした。', 30 );
+			wp_safe_redirect( $redirect_url );
+			exit;
+		}
+
+		check_admin_referer( 'dcj_fpm_delete_subscriber_' . $email, 'dcj_fpm_delete_subscriber_nonce' );
+
+		$subscribers = get_option( self::OPTION_SUBSCRIBERS, array() );
+		$subscribers = is_array( $subscribers ) ? $subscribers : array();
+
+		if ( empty( $subscribers[ $email ] ) || ! is_array( $subscribers[ $email ] ) ) {
+			set_transient( 'dcj_fpm_admin_error', '対象の購読者が見つかりません。', 30 );
+			wp_safe_redirect( $redirect_url );
+			exit;
+		}
+
+		unset( $subscribers[ $email ] );
+		update_option( self::OPTION_SUBSCRIBERS, $subscribers );
+
+		set_transient( 'dcj_fpm_admin_success', '購読者を削除しました。', 30 );
+
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
+
+	/**
 	 * 送信ログを全削除します。
 	 */
 	public function handle_admin_clear_logs() {
@@ -2266,6 +2319,7 @@ class DCJ_Free_PDF_Mailer {
 		<p>
 			<a class="button" href="<?php echo esc_url( $export_url ); ?>"><?php echo esc_html( '購読者リストをCSV出力' ); ?></a>
 		</p>
+		<p><?php echo esc_html( '削除前に必要に応じて購読者CSVを出力してください。削除した購読者は元に戻せません。' ); ?></p>
 		<form method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" style="margin: 1em 0;">
 			<input type="hidden" name="page" value="<?php echo esc_attr( self::PLUGIN_SLUG ); ?>">
 			<label for="dcj-subscriber-search"><?php echo esc_html( 'メールアドレス検索' ); ?></label>
@@ -2320,6 +2374,18 @@ class DCJ_Free_PDF_Mailer {
 							'dcj_fpm_update_subscriber_status_' . $subscriber_email,
 							'dcj_fpm_subscriber_status_nonce'
 						);
+						$delete_url        = wp_nonce_url(
+							add_query_arg(
+								array(
+									'page'                      => self::PLUGIN_SLUG,
+									'dcj_fpm_delete_subscriber' => '1',
+									'subscriber_email'          => $subscriber_email,
+								),
+								admin_url( 'admin.php' )
+							),
+							'dcj_fpm_delete_subscriber_' . $subscriber_email,
+							'dcj_fpm_delete_subscriber_nonce'
+						);
 						?>
 						<tr>
 							<td><?php echo esc_html( ! empty( $subscriber['email'] ) ? $subscriber['email'] : '' ); ?></td>
@@ -2329,7 +2395,11 @@ class DCJ_Free_PDF_Mailer {
 							<td><?php echo esc_html( ! empty( $subscriber['optin_datetime'] ) ? $subscriber['optin_datetime'] : '' ); ?></td>
 							<td><?php echo esc_html( ! empty( $subscriber['last_seen_datetime'] ) ? $subscriber['last_seen_datetime'] : '' ); ?></td>
 							<td><?php echo esc_html( $this->get_subscriber_status_label( $subscriber_status ) ); ?></td>
-							<td><a href="<?php echo esc_url( $status_url ); ?>" onclick="return confirm('<?php echo esc_attr( $confirm_message ); ?>');"><?php echo esc_html( $action_label ); ?></a></td>
+							<td>
+								<a href="<?php echo esc_url( $status_url ); ?>" onclick="return confirm('<?php echo esc_attr( $confirm_message ); ?>');"><?php echo esc_html( $action_label ); ?></a>
+								<?php echo esc_html( ' | ' ); ?>
+								<a href="<?php echo esc_url( $delete_url ); ?>" onclick="return confirm('<?php echo esc_attr( 'この購読者を削除します。元に戻せません。よろしいですか？' ); ?>');"><?php echo esc_html( '削除' ); ?></a>
+							</td>
 						</tr>
 					<?php endforeach; ?>
 				</tbody>
