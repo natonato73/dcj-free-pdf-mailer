@@ -25,6 +25,7 @@ PDF settings are stored in WordPress options. The plugin does not create a custo
 - Prevent repeated submissions from the same email address for a short period.
 - Save recent submission logs and display them in the admin screen.
 - Search and filter the submission log by email address, PDF management ID, and newsletter opt-in status.
+- Apply current admin search and filter conditions to CSV exports.
 - Newsletter opt-in status in submission logs and CSV export.
 - Subscriber list management.
 - Search and filter subscribers by email address and status.
@@ -77,7 +78,7 @@ Use only active subscribed contacts for future newsletters or promotional emails
 
 The unsubscribe URL is included only when `{{unsubscribe_url}}` is placed in the email body. Clicking that URL changes the subscriber status to unsubscribed, but it does not prevent the visitor from receiving the requested free PDF.
 
-CSV exports include email addresses, so store and share them carefully. The admin search and filter controls narrow the currently displayed list range; CSV exports keep their existing behavior.
+CSV exports include email addresses, so store and share them carefully. Submission log CSV files are for checking form submission history and records. For future newsletters, product announcements, or coupons, export the subscriber list after filtering the status to subscribed.
 
 reCAPTCHA v3 is optional. To use it, create v3 keys in the Google reCAPTCHA admin screen, register the actual domain where the form is installed, and enter the Site Key, Secret Key, and score threshold in the plugin settings. A threshold of `0.5` is a practical starting point; if valid submissions fail, try a lower value such as `0.3`. When reCAPTCHA is disabled, the form works as before.
 
