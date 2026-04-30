@@ -31,6 +31,7 @@ PDF settings are stored in WordPress options. The plugin does not create a custo
 - Subscriber CSV export.
 - Subscriber status management.
 - Mark subscribers as subscribed or unsubscribed.
+- Delete individual subscribers from the subscriber list.
 
 ## Requirements
 
