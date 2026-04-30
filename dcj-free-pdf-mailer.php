@@ -17,6 +17,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 }
 
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-dcj-fpm-admin-notices.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-dcj-fpm-csv-exporter.php';
 
 /**
  * DCJ Free PDF Mailer メインクラス
@@ -1881,38 +1882,25 @@ class DCJ_Free_PDF_Mailer {
 		$logs      = $this->filter_submission_logs( $logs, $this->get_submission_log_filters_from_request() );
 		$timestamp = date_i18n( 'Ymd-His', current_time( 'timestamp' ) );
 		$filename  = 'dcj-free-pdf-submission-logs-' . $timestamp . '.csv';
+		$rows      = array(
+			array( '日時', 'メールアドレス', 'PDF ID', '言語', '結果', 'IPアドレス', 'お知らせ同意' ),
+		);
 
-		nocache_headers();
-		header( 'Content-Type: text/csv; charset=UTF-8' );
-		header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
+		foreach ( $logs as $log ) {
+			$newsletter_optin_label = ! empty( $log['newsletter_optin'] ) && 'yes' === $log['newsletter_optin'] ? '同意あり' : '同意なし';
 
-		$output = fopen( 'php://output', 'w' );
-
-		if ( false !== $output ) {
-			fwrite( $output, "\xEF\xBB\xBF" );
-			fputcsv( $output, array( '日時', 'メールアドレス', 'PDF ID', '言語', '結果', 'IPアドレス', 'お知らせ同意' ) );
-
-			foreach ( $logs as $log ) {
-				$newsletter_optin_label = ! empty( $log['newsletter_optin'] ) && 'yes' === $log['newsletter_optin'] ? '同意あり' : '同意なし';
-
-				fputcsv(
-					$output,
-					array(
-						! empty( $log['datetime'] ) ? $log['datetime'] : '',
-						! empty( $log['email'] ) ? $log['email'] : '',
-						! empty( $log['pdf_id'] ) ? $log['pdf_id'] : '',
-						! empty( $log['lang'] ) ? $log['lang'] : '',
-						! empty( $log['result'] ) ? $log['result'] : '',
-						! empty( $log['ip_address'] ) ? $log['ip_address'] : '',
-						$newsletter_optin_label,
-					)
-				);
-			}
-
-			fclose( $output );
+			$rows[] = array(
+				! empty( $log['datetime'] ) ? $log['datetime'] : '',
+				! empty( $log['email'] ) ? $log['email'] : '',
+				! empty( $log['pdf_id'] ) ? $log['pdf_id'] : '',
+				! empty( $log['lang'] ) ? $log['lang'] : '',
+				! empty( $log['result'] ) ? $log['result'] : '',
+				! empty( $log['ip_address'] ) ? $log['ip_address'] : '',
+				$newsletter_optin_label,
+			);
 		}
 
-		exit;
+		DCJ_FPM_CSV_Exporter::output_csv( $filename, $rows );
 	}
 
 	/**
@@ -1970,34 +1958,21 @@ class DCJ_Free_PDF_Mailer {
 
 		$timestamp = date_i18n( 'Ymd-His', current_time( 'timestamp' ) );
 		$filename  = 'dcj-free-pdf-optin-subscribers-' . $timestamp . '.csv';
+		$rows      = array(
+			array( 'メールアドレス', '言語', '登録元PDF ID', '同意日時', 'お知らせ同意' ),
+		);
 
-		nocache_headers();
-		header( 'Content-Type: text/csv; charset=UTF-8' );
-		header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
-
-		$output = fopen( 'php://output', 'w' );
-
-		if ( false !== $output ) {
-			fwrite( $output, "\xEF\xBB\xBF" );
-			fputcsv( $output, array( 'メールアドレス', '言語', '登録元PDF ID', '同意日時', 'お知らせ同意' ) );
-
-			foreach ( $subscribers as $subscriber ) {
-				fputcsv(
-					$output,
-					array(
-						$subscriber['email'],
-						$subscriber['lang'],
-						$subscriber['pdf_id'],
-						$subscriber['datetime'],
-						'同意あり',
-					)
-				);
-			}
-
-			fclose( $output );
+		foreach ( $subscribers as $subscriber ) {
+			$rows[] = array(
+				$subscriber['email'],
+				$subscriber['lang'],
+				$subscriber['pdf_id'],
+				$subscriber['datetime'],
+				'同意あり',
+			);
 		}
 
-		exit;
+		DCJ_FPM_CSV_Exporter::output_csv( $filename, $rows );
 	}
 
 	/**
@@ -2029,36 +2004,23 @@ class DCJ_Free_PDF_Mailer {
 		$subscribers = $this->filter_subscribers( $this->get_subscribers( 0 ), $this->get_subscriber_filters_from_request() );
 		$timestamp   = date_i18n( 'Ymd-His', current_time( 'timestamp' ) );
 		$filename    = 'dcj-free-pdf-subscribers-' . $timestamp . '.csv';
+		$rows        = array(
+			array( 'メールアドレス', '言語', '登録元PDF ID', '登録元タイトル', '初回同意日時', '最終同意日時', '状態' ),
+		);
 
-		nocache_headers();
-		header( 'Content-Type: text/csv; charset=UTF-8' );
-		header( 'Content-Disposition: attachment; filename="' . $filename . '"' );
-
-		$output = fopen( 'php://output', 'w' );
-
-		if ( false !== $output ) {
-			fwrite( $output, "\xEF\xBB\xBF" );
-			fputcsv( $output, array( 'メールアドレス', '言語', '登録元PDF ID', '登録元タイトル', '初回同意日時', '最終同意日時', '状態' ) );
-
-			foreach ( $subscribers as $subscriber ) {
-				fputcsv(
-					$output,
-					array(
-						! empty( $subscriber['email'] ) ? $subscriber['email'] : '',
-						! empty( $subscriber['lang'] ) ? $subscriber['lang'] : '',
-						! empty( $subscriber['source_pdf_id'] ) ? $subscriber['source_pdf_id'] : '',
-						! empty( $subscriber['source_title'] ) ? $subscriber['source_title'] : '',
-						! empty( $subscriber['optin_datetime'] ) ? $subscriber['optin_datetime'] : '',
-						! empty( $subscriber['last_seen_datetime'] ) ? $subscriber['last_seen_datetime'] : '',
-						$this->get_subscriber_status_label( ! empty( $subscriber['status'] ) ? $subscriber['status'] : 'subscribed' ),
-					)
-				);
-			}
-
-			fclose( $output );
+		foreach ( $subscribers as $subscriber ) {
+			$rows[] = array(
+				! empty( $subscriber['email'] ) ? $subscriber['email'] : '',
+				! empty( $subscriber['lang'] ) ? $subscriber['lang'] : '',
+				! empty( $subscriber['source_pdf_id'] ) ? $subscriber['source_pdf_id'] : '',
+				! empty( $subscriber['source_title'] ) ? $subscriber['source_title'] : '',
+				! empty( $subscriber['optin_datetime'] ) ? $subscriber['optin_datetime'] : '',
+				! empty( $subscriber['last_seen_datetime'] ) ? $subscriber['last_seen_datetime'] : '',
+				$this->get_subscriber_status_label( ! empty( $subscriber['status'] ) ? $subscriber['status'] : 'subscribed' ),
+			);
 		}
 
-		exit;
+		DCJ_FPM_CSV_Exporter::output_csv( $filename, $rows );
 	}
 
 	/**
