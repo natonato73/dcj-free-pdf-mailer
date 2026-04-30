@@ -326,6 +326,15 @@ class DCJ_Free_PDF_Mailer {
 
 		$newsletter_optin = ! empty( $_POST['dcj_newsletter_optin'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['dcj_newsletter_optin'] ) ) ? 'yes' : 'no';
 
+		if ( ! $this->verify_recaptcha_submission() ) {
+			$recaptcha_lang    = $this->get_pdf_item_language( $pdf_item, $pdf_id );
+			$recaptcha_message = 'en' === $recaptcha_lang
+				? 'We could not verify your submission. Please try again later.'
+				: '送信を確認できませんでした。時間をおいてもう一度お試しください。';
+			self::$messages[ $pdf_id ] = $this->get_error_message( $recaptcha_message );
+			return;
+		}
+
 		// 重複送信防止チェック（5分以内）
 		$duplicate_key = md5( $pdf_id . $email );
 		if ( get_transient( 'dcj_fpm_sent_' . $duplicate_key ) ) {
@@ -679,11 +688,87 @@ class DCJ_Free_PDF_Mailer {
 
 		$settings = get_option( self::OPTION_MAIL_SETTINGS, array() );
 		$settings = is_array( $settings ) ? $settings : array();
+		$threshold = isset( $settings['recaptcha_threshold'] ) ? (float) $settings['recaptcha_threshold'] : 0.5;
+
+		if ( $threshold < 0 || $threshold > 1 ) {
+			$threshold = 0.5;
+		}
 
 		return array(
-			'from_name'  => ! empty( $settings['from_name'] ) ? sanitize_text_field( $settings['from_name'] ) : 'Dream Coloring Journey',
-			'from_email' => ! empty( $settings['from_email'] ) ? sanitize_email( $settings['from_email'] ) : '',
+			'from_name'             => ! empty( $settings['from_name'] ) ? sanitize_text_field( $settings['from_name'] ) : 'Dream Coloring Journey',
+			'from_email'            => ! empty( $settings['from_email'] ) ? sanitize_email( $settings['from_email'] ) : '',
+			'recaptcha_enabled'     => ! empty( $settings['recaptcha_enabled'] ) ? '1' : '',
+			'recaptcha_site_key'    => ! empty( $settings['recaptcha_site_key'] ) ? sanitize_text_field( $settings['recaptcha_site_key'] ) : '',
+			'recaptcha_secret_key'  => ! empty( $settings['recaptcha_secret_key'] ) ? sanitize_text_field( $settings['recaptcha_secret_key'] ) : '',
+			'recaptcha_threshold'   => $threshold,
 		);
+	}
+
+	/**
+	 * reCAPTCHA v3が検証可能な設定か判定します。
+	 *
+	 * @param array $mail_settings メール送信設定
+	 * @return bool
+	 */
+	private function is_recaptcha_ready( $mail_settings ) {
+
+		return ! empty( $mail_settings['recaptcha_enabled'] )
+			&& ! empty( $mail_settings['recaptcha_site_key'] )
+			&& ! empty( $mail_settings['recaptcha_secret_key'] );
+	}
+
+	/**
+	 * reCAPTCHA v3送信を検証します。
+	 *
+	 * @return bool
+	 */
+	private function verify_recaptcha_submission() {
+
+		$mail_settings = $this->get_mail_settings();
+
+		if ( ! $this->is_recaptcha_ready( $mail_settings ) ) {
+			return true;
+		}
+
+		$token = ! empty( $_POST['dcj_recaptcha_token'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_recaptcha_token'] ) ) : '';
+
+		if ( empty( $token ) ) {
+			return false;
+		}
+
+		$body = array(
+			'secret'   => $mail_settings['recaptcha_secret_key'],
+			'response' => $token,
+		);
+
+		if ( ! empty( $_SERVER['REMOTE_ADDR'] ) ) {
+			$body['remoteip'] = sanitize_text_field( wp_unslash( $_SERVER['REMOTE_ADDR'] ) );
+		}
+
+		$response = wp_remote_post(
+			'https://www.google.com/recaptcha/api/siteverify',
+			array(
+				'timeout' => 8,
+				'body'    => $body,
+			)
+		);
+
+		if ( is_wp_error( $response ) ) {
+			return false;
+		}
+
+		$result = json_decode( wp_remote_retrieve_body( $response ), true );
+
+		if ( ! is_array( $result ) ) {
+			return false;
+		}
+
+		$success   = ! empty( $result['success'] );
+		$score     = isset( $result['score'] ) ? (float) $result['score'] : 0;
+		$action    = ! empty( $result['action'] ) ? sanitize_key( $result['action'] ) : '';
+		$threshold = (float) $mail_settings['recaptcha_threshold'];
+
+		return $success && $score >= $threshold && 'dcj_free_pdf_submit' === $action;
 	}
 
 	/**
@@ -772,9 +857,13 @@ class DCJ_Free_PDF_Mailer {
 		$newsletter_optin_note = 'ja' === $lang
 			? 'チェックしなくても無料PDFはお受け取りいただけます。お知らせやクーポンは不定期でお送りします。'
 			: 'You can receive the free PDF even if you do not check this box. Updates and coupons are sent occasionally.';
+		$mail_settings      = $this->get_mail_settings();
+		$recaptcha_enabled  = $this->is_recaptcha_ready( $mail_settings );
+		$form_id            = self::CSS_PREFIX . 'form-' . $pdf_id;
+		$recaptcha_input_id = self::CSS_PREFIX . 'recaptcha-token-' . $pdf_id;
 
 		$html  = '<div class="' . esc_attr( self::CSS_PREFIX . 'form-container' ) . '" data-pdf-id="' . esc_attr( $pdf_id ) . '">';
-		$html .= '<form method="post" action="" class="' . esc_attr( self::CSS_PREFIX . 'form' ) . '">';
+		$html .= '<form method="post" action="" id="' . esc_attr( $form_id ) . '" class="' . esc_attr( self::CSS_PREFIX . 'form' ) . '">';
 
 		// nonce
 		$html .= $nonce_field;
@@ -784,6 +873,10 @@ class DCJ_Free_PDF_Mailer {
 
 		// PDF識別ID
 		$html .= '<input type="hidden" name="dcj_pdf_id" value="' . esc_attr( $pdf_id ) . '" />';
+
+		if ( $recaptcha_enabled ) {
+			$html .= '<input type="hidden" id="' . esc_attr( $recaptcha_input_id ) . '" name="dcj_recaptcha_token" value="" />';
+		}
 
 		// タイトル
 		$html .= '<div class="' . esc_attr( self::CSS_PREFIX . 'title' ) . '">';
@@ -840,6 +933,30 @@ class DCJ_Free_PDF_Mailer {
 		}
 
 		$html .= '</form>';
+
+		if ( $recaptcha_enabled ) {
+			$html .= '<script src="' . esc_url( 'https://www.google.com/recaptcha/api.js?render=' . rawurlencode( $mail_settings['recaptcha_site_key'] ) ) . '"></script>';
+			$html .= '<script>';
+			$html .= '(function(){';
+			$html .= 'var form=document.getElementById(' . wp_json_encode( $form_id ) . ');';
+			$html .= 'var tokenInput=document.getElementById(' . wp_json_encode( $recaptcha_input_id ) . ');';
+			$html .= 'if(!form||!tokenInput){return;}';
+			$html .= 'form.addEventListener("submit",function(event){';
+			$html .= 'if(form.getAttribute("data-dcj-recaptcha-submitting")==="1"){return;}';
+			$html .= 'event.preventDefault();';
+			$html .= 'if(typeof grecaptcha==="undefined"){form.submit();return;}';
+			$html .= 'grecaptcha.ready(function(){';
+			$html .= 'grecaptcha.execute(' . wp_json_encode( $mail_settings['recaptcha_site_key'] ) . ',{action:"dcj_free_pdf_submit"}).then(function(token){';
+			$html .= 'tokenInput.value=token;';
+			$html .= 'form.setAttribute("data-dcj-recaptcha-submitting","1");';
+			$html .= 'form.submit();';
+			$html .= '});';
+			$html .= '});';
+			$html .= '});';
+			$html .= '})();';
+			$html .= '</script>';
+		}
+
 		$html .= '</div>';
 
 		return $html;
@@ -1483,17 +1600,29 @@ class DCJ_Free_PDF_Mailer {
 
 		$from_name  = ! empty( $_POST['dcj_fpm_from_name'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_fpm_from_name'] ) ) : 'Dream Coloring Journey';
 		$from_email = ! empty( $_POST['dcj_fpm_from_email'] ) ? sanitize_email( wp_unslash( $_POST['dcj_fpm_from_email'] ) ) : '';
+		$recaptcha_enabled    = ! empty( $_POST['dcj_fpm_recaptcha_enabled'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['dcj_fpm_recaptcha_enabled'] ) ) ? '1' : '';
+		$recaptcha_site_key   = ! empty( $_POST['dcj_fpm_recaptcha_site_key'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_fpm_recaptcha_site_key'] ) ) : '';
+		$recaptcha_secret_key = ! empty( $_POST['dcj_fpm_recaptcha_secret_key'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_fpm_recaptcha_secret_key'] ) ) : '';
+		$recaptcha_threshold  = isset( $_POST['dcj_fpm_recaptcha_threshold'] ) ? (float) sanitize_text_field( wp_unslash( $_POST['dcj_fpm_recaptcha_threshold'] ) ) : 0.5;
 
 		if ( ! empty( $from_email ) && ! is_email( $from_email ) ) {
 			set_transient( 'dcj_fpm_admin_error', '送信元メールアドレスの形式が正しくありません。', 30 );
 			return false;
 		}
 
+		if ( $recaptcha_threshold < 0 || $recaptcha_threshold > 1 ) {
+			$recaptcha_threshold = 0.5;
+		}
+
 		update_option(
 			self::OPTION_MAIL_SETTINGS,
 			array(
-				'from_name'  => $from_name,
-				'from_email' => $from_email,
+				'from_name'            => $from_name,
+				'from_email'           => $from_email,
+				'recaptcha_enabled'    => $recaptcha_enabled,
+				'recaptcha_site_key'   => $recaptcha_site_key,
+				'recaptcha_secret_key' => $recaptcha_secret_key,
+				'recaptcha_threshold'  => $recaptcha_threshold,
 			)
 		);
 
@@ -1520,6 +1649,31 @@ class DCJ_Free_PDF_Mailer {
 				<tr>
 					<th scope="row"><label for="dcj_fpm_from_email"><?php echo esc_html( '送信元メールアドレス' ); ?></label></th>
 					<td><input type="email" id="dcj_fpm_from_email" name="dcj_fpm_from_email" value="<?php echo esc_attr( $mail_settings['from_email'] ); ?>" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><?php echo esc_html( 'reCAPTCHA v3' ); ?></th>
+					<td>
+						<label>
+							<input type="checkbox" name="dcj_fpm_recaptcha_enabled" value="1" <?php checked( $mail_settings['recaptcha_enabled'], '1' ); ?> />
+							<?php echo esc_html( 'reCAPTCHA v3を有効にする' ); ?>
+						</label>
+						<p class="description"><?php echo esc_html( 'reCAPTCHA v3を使うにはGoogle reCAPTCHAで発行したSite KeyとSecret Keyが必要です。LocalWPなど登録ドメインと異なる環境では正常に検証できない場合があります。' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_fpm_recaptcha_site_key"><?php echo esc_html( 'Site Key' ); ?></label></th>
+					<td><input type="text" id="dcj_fpm_recaptcha_site_key" name="dcj_fpm_recaptcha_site_key" value="<?php echo esc_attr( $mail_settings['recaptcha_site_key'] ); ?>" class="regular-text" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_fpm_recaptcha_secret_key"><?php echo esc_html( 'Secret Key' ); ?></label></th>
+					<td><input type="password" id="dcj_fpm_recaptcha_secret_key" name="dcj_fpm_recaptcha_secret_key" value="<?php echo esc_attr( $mail_settings['recaptcha_secret_key'] ); ?>" class="regular-text" autocomplete="off" /></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_fpm_recaptcha_threshold"><?php echo esc_html( 'Score Threshold' ); ?></label></th>
+					<td>
+						<input type="number" id="dcj_fpm_recaptcha_threshold" name="dcj_fpm_recaptcha_threshold" value="<?php echo esc_attr( $mail_settings['recaptcha_threshold'] ); ?>" min="0" max="1" step="0.1" />
+						<p class="description"><?php echo esc_html( '通常は0.5から開始し、スパム状況や通常送信の失敗状況を見て調整します。0.0〜1.0の範囲外は0.5として保存されます。' ); ?></p>
+					</td>
 				</tr>
 			</table>
 			<input type="hidden" name="dcj_fpm_mail_settings_nonce" value="<?php echo esc_attr( wp_create_nonce( 'dcj_fpm_mail_settings' ) ); ?>" />
