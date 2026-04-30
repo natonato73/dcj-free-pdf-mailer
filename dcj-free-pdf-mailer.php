@@ -19,6 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-dcj-fpm-admin-notices.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-dcj-fpm-csv-exporter.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-dcj-fpm-recaptcha.php';
+require_once plugin_dir_path( __FILE__ ) . 'includes/class-dcj-fpm-subscriber-helper.php';
 require_once plugin_dir_path( __FILE__ ) . 'includes/class-dcj-fpm-unsubscribe.php';
 
 /**
@@ -623,69 +624,6 @@ class DCJ_Free_PDF_Mailer {
 		}
 
 		return array_slice( $subscribers, 0, absint( $limit ) );
-	}
-
-	/**
-	 * 購読者検索条件を取得します。
-	 *
-	 * @return array
-	 */
-	private function get_subscriber_filters_from_request() {
-
-		$status = ! empty( $_GET['dcj_subscriber_status'] ) ? sanitize_key( wp_unslash( $_GET['dcj_subscriber_status'] ) ) : 'all';
-		$status = in_array( $status, array( 'all', 'subscribed', 'unsubscribed' ), true ) ? $status : 'all';
-
-		return array(
-			'search' => ! empty( $_GET['dcj_subscriber_search'] ) ? sanitize_text_field( wp_unslash( $_GET['dcj_subscriber_search'] ) ) : '',
-			'status' => $status,
-		);
-	}
-
-	/**
-	 * 購読者を検索条件で絞り込みます。
-	 *
-	 * @param array $subscribers 購読者リスト
-	 * @param array $filters 検索条件
-	 * @return array
-	 */
-	private function filter_subscribers( $subscribers, $filters ) {
-
-		if ( empty( $filters['search'] ) && ( empty( $filters['status'] ) || 'all' === $filters['status'] ) ) {
-			return $subscribers;
-		}
-
-		return array_filter(
-			$subscribers,
-			function ( $subscriber ) use ( $filters ) {
-				$email  = ! empty( $subscriber['email'] ) ? sanitize_email( $subscriber['email'] ) : '';
-				$status = ! empty( $subscriber['status'] ) && 'unsubscribed' === $subscriber['status'] ? 'unsubscribed' : 'subscribed';
-
-				if ( ! empty( $filters['search'] ) && false === stripos( $email, $filters['search'] ) ) {
-					return false;
-				}
-
-				if ( ! empty( $filters['status'] ) && 'all' !== $filters['status'] && $status !== $filters['status'] ) {
-					return false;
-				}
-
-				return true;
-			}
-		);
-	}
-
-	/**
-	 * 購読者ステータスの表示名を取得します。
-	 *
-	 * @param string $status 購読者ステータス
-	 * @return string
-	 */
-	private function get_subscriber_status_label( $status ) {
-
-		if ( 'unsubscribed' === $status ) {
-			return '配信停止';
-		}
-
-		return '購読中';
 	}
 
 	/**
@@ -1837,7 +1775,7 @@ class DCJ_Free_PDF_Mailer {
 			wp_die( esc_html( 'CSV出力の確認に失敗しました。' ) );
 		}
 
-		$subscribers = $this->filter_subscribers( $this->get_subscribers( 0 ), $this->get_subscriber_filters_from_request() );
+		$subscribers = DCJ_FPM_Subscriber_Helper::filter_subscribers( $this->get_subscribers( 0 ), DCJ_FPM_Subscriber_Helper::get_filters_from_request() );
 		$timestamp   = date_i18n( 'Ymd-His', current_time( 'timestamp' ) );
 		$filename    = 'dcj-free-pdf-subscribers-' . $timestamp . '.csv';
 		$rows        = array(
@@ -1852,7 +1790,7 @@ class DCJ_Free_PDF_Mailer {
 				! empty( $subscriber['source_title'] ) ? $subscriber['source_title'] : '',
 				! empty( $subscriber['optin_datetime'] ) ? $subscriber['optin_datetime'] : '',
 				! empty( $subscriber['last_seen_datetime'] ) ? $subscriber['last_seen_datetime'] : '',
-				$this->get_subscriber_status_label( ! empty( $subscriber['status'] ) ? $subscriber['status'] : 'subscribed' ),
+				DCJ_FPM_Subscriber_Helper::get_status_label( ! empty( $subscriber['status'] ) ? $subscriber['status'] : 'subscribed' ),
 			);
 		}
 
@@ -2132,11 +2070,11 @@ class DCJ_Free_PDF_Mailer {
 	private function render_subscribers() {
 
 		$subscribers              = $this->get_subscribers( 50 );
-		$subscriber_filters       = $this->get_subscriber_filters_from_request();
+		$subscriber_filters       = DCJ_FPM_Subscriber_Helper::get_filters_from_request();
 		$subscriber_search        = $subscriber_filters['search'];
 		$subscriber_status_filter = $subscriber_filters['status'];
 		$total_subscriber_count   = count( $subscribers );
-		$subscribers              = $this->filter_subscribers( $subscribers, $subscriber_filters );
+		$subscribers              = DCJ_FPM_Subscriber_Helper::filter_subscribers( $subscribers, $subscriber_filters );
 
 		$filtered_subscriber_count = count( $subscribers );
 		$clear_url                 = add_query_arg(
@@ -2241,7 +2179,7 @@ class DCJ_Free_PDF_Mailer {
 							<td><?php echo esc_html( ! empty( $subscriber['source_title'] ) ? $subscriber['source_title'] : '' ); ?></td>
 							<td><?php echo esc_html( ! empty( $subscriber['optin_datetime'] ) ? $subscriber['optin_datetime'] : '' ); ?></td>
 							<td><?php echo esc_html( ! empty( $subscriber['last_seen_datetime'] ) ? $subscriber['last_seen_datetime'] : '' ); ?></td>
-							<td><?php echo esc_html( $this->get_subscriber_status_label( $subscriber_status ) ); ?></td>
+							<td><?php echo esc_html( DCJ_FPM_Subscriber_Helper::get_status_label( $subscriber_status ) ); ?></td>
 							<td>
 								<a href="<?php echo esc_url( $status_url ); ?>" onclick="return confirm('<?php echo esc_attr( $confirm_message ); ?>');"><?php echo esc_html( $action_label ); ?></a>
 								<?php echo esc_html( ' | ' ); ?>
