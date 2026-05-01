@@ -1951,7 +1951,7 @@ class DCJ_Free_PDF_Mailer {
 	}
 
 	/**
-	 * 購読者リストをCSV出力します。
+	 * 購読者リストを管理・バックアップ用CSVとして出力します。
 	 */
 	public function handle_admin_export_subscribers() {
 
@@ -2016,12 +2016,12 @@ class DCJ_Free_PDF_Mailer {
 		}
 
 		if ( empty( $_GET['dcj_fpm_export_broadcast_subscribers_nonce'] ) ) {
-			wp_die( esc_html( '配信用CSV出力の確認に失敗しました。' ) );
+			wp_die( esc_html( 'メール配信用CSV出力の確認に失敗しました。' ) );
 		}
 
 		$nonce = sanitize_text_field( wp_unslash( $_GET['dcj_fpm_export_broadcast_subscribers_nonce'] ) );
 		if ( ! wp_verify_nonce( $nonce, 'dcj_fpm_export_broadcast_subscribers' ) ) {
-			wp_die( esc_html( '配信用CSV出力の確認に失敗しました。' ) );
+			wp_die( esc_html( 'メール配信用CSV出力の確認に失敗しました。' ) );
 		}
 
 		$subscriber_filters           = DCJ_FPM_Subscriber_Helper::get_filters_from_request();
@@ -2259,7 +2259,7 @@ class DCJ_Free_PDF_Mailer {
 			<?php endif; ?>
 		</p>
 		<p><?php echo esc_html( '送信ログCSVは、フォーム送信履歴の確認用です。お知らせ配信・販売案内・クーポン案内に使うメールアドレスは、購読者リストで「購読中」に絞り込んでCSV出力してください。' ); ?></p>
-		<p><?php echo esc_html( '現在の検索・絞り込み条件はCSV出力にも反映されます。' ); ?></p>
+		<p><?php echo esc_html( '現在の検索・絞り込み条件は送信ログCSVにも反映されます。' ); ?></p>
 		<form method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" style="margin: 1em 0;">
 			<input type="hidden" name="page" value="<?php echo esc_attr( self::PLUGIN_SLUG ); ?>">
 			<label for="dcj-log-email-search"><?php echo esc_html( 'メールアドレス検索' ); ?></label>
@@ -2362,13 +2362,13 @@ class DCJ_Free_PDF_Mailer {
 		?>
 		<h2><?php echo esc_html( '購読者リスト' ); ?></h2>
 		<p>
-			<a class="button" href="<?php echo esc_url( $export_url ); ?>"><?php echo esc_html( '購読者リストをCSV出力' ); ?></a>
-			<a class="button button-secondary" href="<?php echo esc_url( $broadcast_export_url ); ?>"><?php echo esc_html( '配信用CSV出力' ); ?></a>
+			<a class="button" href="<?php echo esc_url( $export_url ); ?>"><?php echo esc_html( '管理・バックアップ用CSV出力' ); ?></a>
+			<a class="button button-secondary" href="<?php echo esc_url( $broadcast_export_url ); ?>"><?php echo esc_html( 'メール配信用CSV出力' ); ?></a>
 		</p>
-		<p><?php echo esc_html( '現在の検索・絞り込み条件はCSV出力にも反映されます。' ); ?></p>
-		<p><?php echo esc_html( '購読者リストCSVは管理・バックアップ用です。配信用CSVはメール配信サービスへの手動インポート用で、購読中のメールアドレスのみを出力します。' ); ?></p>
+		<p><?php echo esc_html( '管理・バックアップ用CSVは、購読者の確認・保管用です。現在の検索・絞り込み条件が反映されます。' ); ?></p>
+		<p><?php echo esc_html( 'メール配信用CSVは、メール配信サービスへ手動インポートするためのCSVです。検索条件を反映し、購読中のメールアドレスのみを出力します。' ); ?></p>
 		<p><?php echo esc_html( 'お知らせ配信・販売案内・クーポン案内には、購読中のメールアドレスのみを使用してください。配信停止の方には送らないでください。' ); ?></p>
-		<p><?php echo esc_html( '削除前に必要に応じて購読者CSVを出力してください。削除した購読者は元に戻せません。' ); ?></p>
+		<p><?php echo esc_html( '削除前に必要に応じて管理・バックアップ用CSVを出力してください。削除した購読者は元に戻せません。' ); ?></p>
 		<form method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" style="margin: 1em 0;">
 			<input type="hidden" name="page" value="<?php echo esc_attr( self::PLUGIN_SLUG ); ?>">
 			<label for="dcj-subscriber-search"><?php echo esc_html( 'メールアドレス検索' ); ?></label>
