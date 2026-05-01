@@ -2271,15 +2271,14 @@ class DCJ_Free_PDF_Mailer {
 
 		?>
 		<h2><?php echo esc_html( '送信ログ' ); ?></h2>
-                <p><?php echo esc_html( '無料PDFフォームの送信履歴を確認できます。メール配信に使う宛先は、購読者リストのメール配信用CSVから出力してください。' ); ?></p>
+                <p><?php echo esc_html( '無料PDFフォームの送信履歴を確認できます。メール配信用の宛先は、購読者リストのメール配信用CSVから出力してください。' ); ?></p>
 		<p>
 			<a class="button" href="<?php echo esc_url( $export_url ); ?>"><?php echo esc_html( '送信ログをCSV出力' ); ?></a>
 			<?php if ( 0 < $total_log_count ) : ?>
 				<a class="button" href="<?php echo esc_url( $clear_url ); ?>" onclick="return confirm('<?php echo esc_attr( '送信ログをすべて削除します。元に戻せません。よろしいですか？' ); ?>');"><?php echo esc_html( '送信ログをすべて削除' ); ?></a>
 			<?php endif; ?>
 		</p>
-		<p><?php echo esc_html( '送信ログCSVは、フォーム送信履歴の確認・保管用です。' ); ?></p>
-		<p><?php echo esc_html( '現在の検索・絞り込み条件は送信ログCSVにも反映されます。' ); ?></p>
+		<p><?php echo esc_html( '送信ログCSVは履歴の確認・保管用です。現在の検索・絞り込み条件も反映されます。' ); ?></p>
 		<form method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" style="margin: 1em 0;">
 			<input type="hidden" name="page" value="<?php echo esc_attr( self::PLUGIN_SLUG ); ?>">
 			<label for="dcj-log-email-search"><?php echo esc_html( 'メールアドレス検索' ); ?></label>
@@ -2409,15 +2408,15 @@ class DCJ_Free_PDF_Mailer {
 
 		?>
 		<h2><?php echo esc_html( '購読者リスト' ); ?></h2>
+		<p><?php echo esc_html( 'お知らせ受信に同意したメールアドレスを管理します。配信に使う場合は、購読中のメールアドレスだけを対象にしてください。' ); ?></p>
 		<p>
 			<a class="button" href="<?php echo esc_url( $export_url ); ?>"><?php echo esc_html( '管理・バックアップ用CSV出力' ); ?></a>
 			<a class="button button-secondary" href="<?php echo esc_url( $broadcast_export_url ); ?>"><?php echo esc_html( 'メール配信用CSV出力（全言語）' ); ?></a>
 			<a class="button button-secondary" href="<?php echo esc_url( $broadcast_export_ja_url ); ?>"><?php echo esc_html( '日本語メール配信用CSV出力' ); ?></a>
 			<a class="button button-secondary" href="<?php echo esc_url( $broadcast_export_en_url ); ?>"><?php echo esc_html( '英語メール配信用CSV出力' ); ?></a>
 		</p>
-		<p><?php echo esc_html( '管理・バックアップ用CSVは、購読者リストの確認・保管用です。現在の検索・絞り込み条件が反映されます。' ); ?></p>
-		<p><?php echo esc_html( 'メール配信用CSVは、メール配信サービスへ手動インポートするためのCSVです。検索条件を反映し、購読中のメールアドレスのみを出力します。日本語・英語のみのCSVも出力できます。' ); ?></p>
-		<p><?php echo esc_html( 'お知らせ配信・販売案内・クーポン案内には、購読中のメールアドレスのみを使用してください。配信停止の方には送らないでください。' ); ?></p>
+		<p><?php echo esc_html( '管理・バックアップ用CSVは、購読者リストの確認・保管用です。メール配信用CSVは、メール配信サービスへ手動インポートするためのCSVです。' ); ?></p>
+		<p><?php echo esc_html( 'メール配信用CSVは検索条件を反映し、購読中のみを出力します。全言語、日本語のみ、英語のみを選べます。配信停止の方には送らないでください。' ); ?></p>
 		<p><?php echo esc_html( '削除前に必要に応じて管理・バックアップ用CSVを出力してください。削除した購読者は元に戻せません。' ); ?></p>
 		<form method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" style="margin: 1em 0;">
 			<input type="hidden" name="page" value="<?php echo esc_attr( self::PLUGIN_SLUG ); ?>">
@@ -2705,6 +2704,7 @@ class DCJ_Free_PDF_Mailer {
 
 		?>
 		<h2><?php echo esc_html( '新規PDF設定を追加' ); ?></h2>
+		<p><?php echo esc_html( '新しい無料PDFフォームを作成します。必須項目を入力し、保存後にショートコードを固定ページや投稿へ貼り付けてください。' ); ?></p>
 		<?php if ( ! empty( $duplicate_error ) ) : ?>
 			<div class="notice notice-error inline"><p><?php echo esc_html( $duplicate_error ); ?></p></div>
 		<?php endif; ?>
@@ -2991,6 +2991,7 @@ class DCJ_Free_PDF_Mailer {
 
 		?>
 		<h2><?php echo esc_html( 'PDF設定を編集' ); ?></h2>
+		<p><?php echo esc_html( '既存の無料PDFフォーム設定を編集します。公開中のフォームに反映されるため、PDF URLやメール本文は更新前に確認してください。' ); ?></p>
 
 		<form method="post" action="">
 			<table class="form-table">
@@ -3278,6 +3279,7 @@ class DCJ_Free_PDF_Mailer {
 
 		?>
 		<h2><?php echo esc_html( '確認用フォーム' ); ?></h2>
+		<p><?php echo esc_html( '選択中のPDF設定で表示される申込フォームと、送信メールの内容を確認できます。公開前の見た目と文面確認に使ってください。' ); ?></p>
 		<p><?php echo esc_html( 'ショートコード: ' ); ?><code><?php echo esc_html( '[dcj_free_pdf id="' . $preview_pdf_id . '"]' ); ?></code></p>
 		<?php echo $this->get_form_html( $preview_pdf_id, $preview_pdf_item ); ?>
 		<h3><?php echo esc_html( 'PDF URL' ); ?></h3>
