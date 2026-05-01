@@ -72,6 +72,7 @@ class DCJ_Free_PDF_Mailer {
 		add_action( 'admin_init', array( $this, 'handle_admin_export_optin_subscribers' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_export_subscribers' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_export_broadcast_subscribers' ) );
+		add_action( 'admin_init', array( $this, 'handle_admin_add_subscriber' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_update_subscriber_status' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_delete_subscriber' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_clear_logs' ) );
@@ -2066,6 +2067,105 @@ class DCJ_Free_PDF_Mailer {
 	}
 
 	/**
+	 * 購読者を手動追加します。
+	 */
+	public function handle_admin_add_subscriber() {
+
+		if ( empty( $_POST['dcj_fpm_add_subscriber_submit'] ) ) {
+			return;
+		}
+
+		$redirect_url = add_query_arg(
+			array(
+				'page' => self::PLUGIN_SLUG,
+			),
+			admin_url( 'admin.php' )
+		);
+		$redirect_url = $redirect_url . '#dcj-manual-subscriber-add';
+
+		if ( empty( $_POST['page'] ) || self::PLUGIN_SLUG !== sanitize_key( wp_unslash( $_POST['page'] ) ) ) {
+			return;
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'dcj-free-pdf-mailer' ) );
+		}
+
+		if ( empty( $_POST['dcj_fpm_add_subscriber_nonce'] ) ) {
+			set_transient( 'dcj_fpm_admin_error', '購読者追加の確認に失敗しました。', 30 );
+			set_transient( 'dcj_fpm_manual_subscriber_error', '購読者追加の確認に失敗しました。', 30 );
+			wp_safe_redirect( $redirect_url );
+			exit;
+		}
+
+		$nonce = sanitize_text_field( wp_unslash( $_POST['dcj_fpm_add_subscriber_nonce'] ) );
+		if ( ! wp_verify_nonce( $nonce, 'dcj_fpm_add_subscriber' ) ) {
+			set_transient( 'dcj_fpm_admin_error', '購読者追加の確認に失敗しました。', 30 );
+			set_transient( 'dcj_fpm_manual_subscriber_error', '購読者追加の確認に失敗しました。', 30 );
+			wp_safe_redirect( $redirect_url );
+			exit;
+		}
+
+		$email = ! empty( $_POST['dcj_manual_subscriber_email'] ) ? strtolower( sanitize_email( wp_unslash( $_POST['dcj_manual_subscriber_email'] ) ) ) : '';
+		$lang  = ! empty( $_POST['dcj_manual_subscriber_lang'] ) ? sanitize_key( wp_unslash( $_POST['dcj_manual_subscriber_lang'] ) ) : '';
+		$memo  = ! empty( $_POST['dcj_manual_subscriber_source_note'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_manual_subscriber_source_note'] ) ) : '';
+
+		if ( empty( $email ) || ! is_email( $email ) ) {
+			set_transient( 'dcj_fpm_admin_error', 'メールアドレスを正しく入力してください。', 30 );
+			set_transient( 'dcj_fpm_manual_subscriber_error', 'メールアドレスを正しく入力してください。', 30 );
+			wp_safe_redirect( $redirect_url );
+			exit;
+		}
+
+		if ( ! in_array( $lang, array( '', 'ja', 'en' ), true ) ) {
+			set_transient( 'dcj_fpm_admin_error', '言語の選択値を確認してください。', 30 );
+			set_transient( 'dcj_fpm_manual_subscriber_error', '言語の選択値を確認してください。', 30 );
+			wp_safe_redirect( $redirect_url );
+			exit;
+		}
+
+		if ( empty( $_POST['dcj_manual_subscriber_consent_confirmed'] ) || '1' !== sanitize_text_field( wp_unslash( $_POST['dcj_manual_subscriber_consent_confirmed'] ) ) ) {
+			set_transient( 'dcj_fpm_admin_error', '同意確認済みにチェックを入れてください。', 30 );
+			set_transient( 'dcj_fpm_manual_subscriber_error', '同意確認済みにチェックを入れてください。', 30 );
+			wp_safe_redirect( $redirect_url );
+			exit;
+		}
+
+		$subscribers = get_option( self::OPTION_SUBSCRIBERS, array() );
+		$subscribers = is_array( $subscribers ) ? $subscribers : array();
+
+		if ( isset( $subscribers[ $email ] ) ) {
+			set_transient( 'dcj_fpm_admin_error', '既に登録済み、または配信停止済みです。', 30 );
+			set_transient( 'dcj_fpm_manual_subscriber_error', '既に登録済み、または配信停止済みです。', 30 );
+			wp_safe_redirect( $redirect_url );
+			exit;
+		}
+
+		$now = current_time( 'mysql' );
+
+		$subscribers[ $email ] = array(
+			'email'              => $email,
+			'lang'               => $lang,
+			'source_pdf_id'      => 'manual',
+			'source_title'       => ! empty( $memo ) ? $memo : '手動追加',
+			'optin_datetime'     => $now,
+			'last_seen_datetime' => $now,
+			'status'             => 'subscribed',
+		);
+
+		if ( update_option( self::OPTION_SUBSCRIBERS, $subscribers ) ) {
+			set_transient( 'dcj_fpm_admin_success', '購読者を手動追加しました。', 30 );
+			set_transient( 'dcj_fpm_manual_subscriber_success', '購読者を手動追加しました。', 30 );
+		} else {
+			set_transient( 'dcj_fpm_admin_error', '購読者の追加に失敗しました。', 30 );
+			set_transient( 'dcj_fpm_manual_subscriber_error', '購読者の追加に失敗しました。', 30 );
+		}
+
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
+
+	/**
 	 * 購読者ステータスを更新します。
 	 */
 	public function handle_admin_update_subscriber_status() {
@@ -2418,6 +2518,46 @@ class DCJ_Free_PDF_Mailer {
 		<p><?php echo esc_html( '管理・バックアップ用CSVは、購読者リストの確認・保管用です。メール配信用CSVは、メール配信サービスへ手動インポートするためのCSVです。' ); ?></p>
 		<p><?php echo esc_html( 'メール配信用CSVは検索条件を反映し、購読中のみを出力します。全言語、日本語のみ、英語のみを選べます。配信停止の方には送らないでください。' ); ?></p>
 		<p><?php echo esc_html( '削除前に必要に応じて管理・バックアップ用CSVを出力してください。削除した購読者は元に戻せません。' ); ?></p>
+		<h3 id="dcj-manual-subscriber-add"><?php echo esc_html( '購読者を手動追加' ); ?></h3>
+		<p><?php echo esc_html( '同意確認済みのメールアドレスだけを1件ずつ追加できます。既に登録済み、または配信停止済みのメールアドレスは追加できません。' ); ?></p>
+		<?php
+		$manual_subscriber_success = get_transient( 'dcj_fpm_manual_subscriber_success' );
+		$manual_subscriber_error   = get_transient( 'dcj_fpm_manual_subscriber_error' );
+
+		if ( false !== $manual_subscriber_success ) {
+			delete_transient( 'dcj_fpm_manual_subscriber_success' );
+			?>
+			<div class="notice notice-success inline"><p><?php echo esc_html( $manual_subscriber_success ); ?></p></div>
+			<?php
+		}
+
+		if ( false !== $manual_subscriber_error ) {
+			delete_transient( 'dcj_fpm_manual_subscriber_error' );
+			?>
+			<div class="notice notice-error inline"><p><?php echo esc_html( $manual_subscriber_error ); ?></p></div>
+			<?php
+		}
+		?>
+		<form method="post" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" style="margin: 1em 0;">
+			<input type="hidden" name="page" value="<?php echo esc_attr( self::PLUGIN_SLUG ); ?>">
+			<input type="hidden" name="dcj_fpm_add_subscriber_submit" value="1">
+			<?php wp_nonce_field( 'dcj_fpm_add_subscriber', 'dcj_fpm_add_subscriber_nonce' ); ?>
+			<label for="dcj-manual-subscriber-email"><?php echo esc_html( 'メールアドレス' ); ?> *</label>
+			<input type="email" id="dcj-manual-subscriber-email" name="dcj_manual_subscriber_email" value="" required>
+			<label for="dcj-manual-subscriber-lang"><?php echo esc_html( '言語' ); ?></label>
+			<select id="dcj-manual-subscriber-lang" name="dcj_manual_subscriber_lang">
+				<option value=""><?php echo esc_html( '未指定' ); ?></option>
+				<option value="ja"><?php echo esc_html( '日本語' ); ?></option>
+				<option value="en"><?php echo esc_html( '英語' ); ?></option>
+			</select>
+			<label for="dcj-manual-subscriber-source-note"><?php echo esc_html( '登録元メモ' ); ?></label>
+			<input type="text" id="dcj-manual-subscriber-source-note" name="dcj_manual_subscriber_source_note" value="" placeholder="<?php echo esc_attr( '例：店頭申込、個別同意など' ); ?>">
+			<label for="dcj-manual-subscriber-consent-confirmed">
+				<input type="checkbox" id="dcj-manual-subscriber-consent-confirmed" name="dcj_manual_subscriber_consent_confirmed" value="1" required>
+				<?php echo esc_html( '同意確認済み' ); ?> *
+			</label>
+			<button type="submit" class="button button-secondary"><?php echo esc_html( '購読者を追加' ); ?></button>
+		</form>
 		<form method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" style="margin: 1em 0;">
 			<input type="hidden" name="page" value="<?php echo esc_attr( self::PLUGIN_SLUG ); ?>">
 			<label for="dcj-subscriber-search"><?php echo esc_html( 'メールアドレス検索' ); ?></label>
