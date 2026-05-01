@@ -2271,13 +2271,14 @@ class DCJ_Free_PDF_Mailer {
 
 		?>
 		<h2><?php echo esc_html( '送信ログ' ); ?></h2>
+                <p><?php echo esc_html( '無料PDFフォームの送信履歴を確認できます。メール配信に使う宛先は、購読者リストのメール配信用CSVから出力してください。' ); ?></p>
 		<p>
 			<a class="button" href="<?php echo esc_url( $export_url ); ?>"><?php echo esc_html( '送信ログをCSV出力' ); ?></a>
 			<?php if ( 0 < $total_log_count ) : ?>
 				<a class="button" href="<?php echo esc_url( $clear_url ); ?>" onclick="return confirm('<?php echo esc_attr( '送信ログをすべて削除します。元に戻せません。よろしいですか？' ); ?>');"><?php echo esc_html( '送信ログをすべて削除' ); ?></a>
 			<?php endif; ?>
 		</p>
-		<p><?php echo esc_html( '送信ログCSVは、フォーム送信履歴の確認用です。お知らせ配信・販売案内・クーポン案内には、購読者リストのメール配信用CSVを使用してください。' ); ?></p>
+		<p><?php echo esc_html( '送信ログCSVは、フォーム送信履歴の確認・保管用です。' ); ?></p>
 		<p><?php echo esc_html( '現在の検索・絞り込み条件は送信ログCSVにも反映されます。' ); ?></p>
 		<form method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" style="margin: 1em 0;">
 			<input type="hidden" name="page" value="<?php echo esc_attr( self::PLUGIN_SLUG ); ?>">
