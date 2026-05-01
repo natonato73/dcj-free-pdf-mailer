@@ -6,8 +6,8 @@
 
 - 最新版：v1.2.0
 - GitHub Release：作成済み
-- 納品用zip：D:\Dev_Projects\dcj-free-pdf-mailer.zip
-- 自分用保管zip：D:\Dev_Projects\dcj-free-pdf-mailer-with-sales-materials.zip
+- 納品用zip：D:\Dev_Projects\dcj-free-pdf-mailer\dcj-free-pdf-mailer.zip
+- 自分用保管zip：D:\Dev_Projects\dcj-free-pdf-mailer\dcj-free-pdf-mailer-with-sales-materials.zip
 
 GitHub Release URL：
 
