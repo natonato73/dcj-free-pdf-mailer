@@ -34,6 +34,9 @@ PDF settings are stored in WordPress options. The plugin does not create a custo
 - Subscriber list management.
 - Search and filter subscribers by email address and status.
 - Subscriber CSV export.
+- Broadcast CSV export.
+- Export subscribed email addresses only for broadcast use.
+- Helper CSV for manual import into an email marketing service.
 - Subscriber status management.
 - Mark subscribers as subscribed or unsubscribed.
 - Delete individual subscribers from the subscriber list.
@@ -94,7 +97,9 @@ The unsubscribe URL is included when `{{unsubscribe_url}}` is placed in the emai
 
 Clicking an unsubscribe URL changes the subscriber status to unsubscribed, but it does not prevent the visitor from receiving the requested free PDF.
 
-CSV exports include email addresses, so store and share them carefully. Submission log CSV files are for checking form submission history and records. For future newsletters, product announcements, or coupons, export the subscriber list after filtering the status to subscribed.
+CSV exports include email addresses, so store and share them carefully. Submission log CSV files are for checking form submission history and records. The subscriber list CSV remains available for subscriber management and backup.
+
+For future newsletters, product announcements, or coupons, use the broadcast CSV export. It is intended to help with manual import into an email marketing service and includes subscribed contacts only. Always check the CSV content, consent status, unsubscribed contacts, and the email marketing service settings before sending.
 
 reCAPTCHA v3 is optional. To use it, create v3 keys in the Google reCAPTCHA admin screen, register the actual domain where the form is installed, and enter the Site Key, Secret Key, and score threshold in the plugin settings. A threshold of `0.5` is a practical starting point; if valid submissions fail, try a lower value such as `0.3`. When reCAPTCHA is disabled, the form works as before.
 
@@ -115,6 +120,7 @@ Current status:
 - Subscriber list management is implemented.
 - Subscriber status management is implemented.
 - Subscriber search/filtering and unsubscribe URL handling are implemented.
+- Broadcast CSV export for subscribed contacts is implemented.
 
 This plugin is still project-specific and should be reviewed before reuse on unrelated sites.
 

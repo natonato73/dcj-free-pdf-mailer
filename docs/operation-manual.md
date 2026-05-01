@@ -275,7 +275,7 @@ Click **送信ログをCSV出力** to download submission logs as a CSV file.
 
 The CSV includes email addresses and newsletter opt-in status. Treat exported files carefully, store them only where needed, and use opt-in status responsibly when planning future updates or promotional messages.
 
-Submission log CSV files are for checking form submission history and records. For future newsletters, product announcements, or coupons, use the subscriber CSV after filtering the subscriber status to subscribed.
+Submission log CSV files are for checking form submission history and records. The subscriber list CSV is kept for subscriber management and backup. For future newsletters, product announcements, or coupons, use the broadcast CSV export near the subscriber list.
 
 CSV files may contain email addresses. Store downloaded CSV files carefully, delete unnecessary CSV files, and mask email addresses if sharing logs or CSV files externally.
 
@@ -302,7 +302,34 @@ Subscriber status can be either:
 
 Admins can use **配信停止にする** to mark a subscriber as unsubscribed, or **購読中に戻す** to mark the subscriber as subscribed again. If an unsubscribed user submits the free PDF form again with newsletter opt-in checked, the status is set back to subscribed.
 
-Click **購読者リストをCSV出力** to export the subscriber list as a CSV file. Use only subscribed contacts for future newsletters, coupons, or promotional emails. Do not send promotional emails to unsubscribed contacts.
+Click **購読者リストをCSV出力** to export the subscriber list as a CSV file. This CSV is for subscriber management and backup.
+
+### Broadcast CSV Export
+
+Click **配信用CSV出力** near the subscriber list to download a CSV intended for manual import into an email marketing service.
+
+Difference from the subscriber list CSV:
+
+- **Subscriber list CSV**: for subscriber management and backup.
+- **Broadcast CSV**: for checking contacts before newsletters, product announcements, coupons, or similar emails.
+
+The broadcast CSV includes subscribed contacts only. Unsubscribed contacts are not included.
+
+Search and filter conditions are applied where possible. However, even if the status filter is set to unsubscribed, the broadcast CSV still exports subscribed contacts only.
+
+Broadcast CSV columns:
+
+- Email address
+- Language
+- Source PDF ID
+- Source title
+- Last opt-in datetime
+
+Use only subscribed email addresses for newsletters, promotional emails, or coupon emails. Do not send these emails to unsubscribed contacts.
+
+Always check the CSV before importing it into an email marketing service. Also check consent status, unsubscribed contacts, and the consent and unsubscribe settings in the email marketing service before sending.
+
+The CSV contains email addresses, which are personal information. Store downloaded CSV files carefully and delete files that are no longer needed.
 
 ### Searching and Filtering Subscribers
 
@@ -318,7 +345,7 @@ Available controls:
 
 The screen shows the total subscriber count and the filtered result count. Use the clear link to reset the search conditions.
 
-The current search and filter controls narrow the currently displayed subscriber list range. The same search and filter conditions are also applied to the subscriber CSV export.
+The current search and filter controls narrow the currently displayed subscriber list range. The same search and filter conditions are also applied to the subscriber CSV export and, where possible, to the broadcast CSV export.
 
 ### Deleting Individual Subscribers
 
@@ -417,6 +444,7 @@ The plugin prevents repeated submissions from the same email address for a short
 - Confirm that the admin screen opens after updating the plugin.
 - Confirm submission log CSV export.
 - Confirm subscriber CSV export.
+- Confirm broadcast CSV export.
 - Confirm reCAPTCHA when it is enabled.
 - Confirm the unsubscribe URL.
 - Confirm subscriber list display and filtering.
@@ -428,4 +456,5 @@ The plugin prevents repeated submissions from the same email address for a short
 - Use only subscribed email addresses for future updates, product announcements, or coupons.
 - Do not send updates or promotional emails to unsubscribed contacts.
 - Treat email addresses, submission logs, and CSV exports as sensitive operational data.
-- Treat subscriber CSV exports carefully and exclude unsubscribed contacts from future promotional email use.
+- Treat subscriber CSV exports as management and backup files.
+- Before importing a broadcast CSV into an email marketing service, check the CSV content and the service-side consent and unsubscribe settings.
