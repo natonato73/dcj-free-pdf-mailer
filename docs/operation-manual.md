@@ -304,6 +304,33 @@ Admins can use **配信停止にする** to mark a subscriber as unsubscribed, o
 
 Click **管理・バックアップ用CSV出力** to export the subscriber list as a CSV file. This CSV is for subscriber management and backup.
 
+### Manually Adding a Subscriber
+
+The v1.3.0 development version includes a manual add form in the **購読者リスト** section. v1.3.0 has not been released yet.
+
+Use this form only when the email address has already been confirmed as opted in.
+
+Input fields:
+
+- Email address: required.
+- Language: `ja`, `en`, or blank.
+- Source note: optional. This is saved as the source title, such as a memo for where consent was confirmed.
+- Consent confirmed checkbox: required.
+
+Steps:
+
+1. Open **DCJ Free PDF**.
+2. Go to **購読者リスト**.
+3. Enter the email address.
+4. Select the language if needed.
+5. Enter a source note if needed.
+6. Check **同意確認済み**.
+7. Click **購読者を追加**.
+
+Already registered email addresses cannot be added again. Email addresses that are already unsubscribed also cannot be added manually, and the plugin does not automatically return them to subscribed. If this happens, the admin screen shows an error message.
+
+Manually added subscribers are stored in the same subscriber list format as form opt-ins. They are included in subscriber list display and CSV exports in the same way as other subscribers.
+
 ### Broadcast CSV Export
 
 Click **メール配信用CSV出力（全言語）**, **日本語メール配信用CSV出力**, or **英語メール配信用CSV出力** near the subscriber list to download a CSV intended for manual import into an email marketing service.
