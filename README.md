@@ -99,7 +99,7 @@ Clicking an unsubscribe URL changes the subscriber status to unsubscribed, but i
 
 CSV exports include email addresses, so store and share them carefully. Submission log CSV files are for checking form submission history and records. The subscriber list CSV remains available for subscriber management and backup.
 
-For future newsletters, product announcements, or coupons, use the broadcast CSV export. It is intended to help with manual import into an email marketing service and includes subscribed contacts only. Always check the CSV content, consent status, unsubscribed contacts, and the email marketing service settings before sending.
+For future newsletters, product announcements, or coupons, use the broadcast CSV export. It is intended to help with manual import into an email marketing service and includes subscribed contacts only. Broadcast CSV files can be exported for all languages, Japanese only, or English only. Always check the CSV content, consent status, unsubscribed contacts, and the email marketing service settings before sending.
 
 reCAPTCHA v3 is optional. To use it, create v3 keys in the Google reCAPTCHA admin screen, register the actual domain where the form is installed, and enter the Site Key, Secret Key, and score threshold in the plugin settings. A threshold of `0.5` is a practical starting point; if valid submissions fail, try a lower value such as `0.3`. When reCAPTCHA is disabled, the form works as before.
 
@@ -120,7 +120,7 @@ Current status:
 - Subscriber list management is implemented.
 - Subscriber status management is implemented.
 - Subscriber search/filtering and unsubscribe URL handling are implemented.
-- Broadcast CSV export for subscribed contacts is implemented.
+- Broadcast CSV export for subscribed contacts is implemented, including all-language, Japanese-only, and English-only exports.
 
 This plugin is still project-specific and should be reviewed before reuse on unrelated sites.
 

@@ -302,18 +302,18 @@ Subscriber status can be either:
 
 Admins can use **配信停止にする** to mark a subscriber as unsubscribed, or **購読中に戻す** to mark the subscriber as subscribed again. If an unsubscribed user submits the free PDF form again with newsletter opt-in checked, the status is set back to subscribed.
 
-Click **購読者リストをCSV出力** to export the subscriber list as a CSV file. This CSV is for subscriber management and backup.
+Click **管理・バックアップ用CSV出力** to export the subscriber list as a CSV file. This CSV is for subscriber management and backup.
 
 ### Broadcast CSV Export
 
-Click **配信用CSV出力** near the subscriber list to download a CSV intended for manual import into an email marketing service.
+Click **メール配信用CSV出力（全言語）**, **日本語メール配信用CSV出力**, or **英語メール配信用CSV出力** near the subscriber list to download a CSV intended for manual import into an email marketing service.
 
 Difference from the subscriber list CSV:
 
 - **Subscriber list CSV**: for subscriber management and backup.
-- **Broadcast CSV**: for checking contacts before newsletters, product announcements, coupons, or similar emails.
+- **Broadcast CSV**: for checking contacts before newsletters, product announcements, coupons, or similar emails. It can be exported for all languages, Japanese only, or English only.
 
-The broadcast CSV includes subscribed contacts only. Unsubscribed contacts are not included.
+The broadcast CSV includes subscribed contacts only. Unsubscribed contacts are not included. The all-language export includes all subscribed contacts, the Japanese-only export includes subscribed contacts with `ja`, and the English-only export includes subscribed contacts with `en`.
 
 Search and filter conditions are applied where possible. However, even if the status filter is set to unsubscribed, the broadcast CSV still exports subscribed contacts only.
 
@@ -444,7 +444,7 @@ The plugin prevents repeated submissions from the same email address for a short
 - Confirm that the admin screen opens after updating the plugin.
 - Confirm submission log CSV export.
 - Confirm subscriber CSV export.
-- Confirm broadcast CSV export.
+- Confirm broadcast CSV export for all languages, Japanese only, and English only.
 - Confirm reCAPTCHA when it is enabled.
 - Confirm the unsubscribe URL.
 - Confirm subscriber list display and filtering.
@@ -457,4 +457,4 @@ The plugin prevents repeated submissions from the same email address for a short
 - Do not send updates or promotional emails to unsubscribed contacts.
 - Treat email addresses, submission logs, and CSV exports as sensitive operational data.
 - Treat subscriber CSV exports as management and backup files.
-- Before importing a broadcast CSV into an email marketing service, check the CSV content and the service-side consent and unsubscribe settings.
+- Before importing a broadcast CSV into an email marketing service, check the CSV content, language target, and the service-side consent and unsubscribe settings.
