@@ -1241,7 +1241,7 @@ class DCJ_Free_PDF_Mailer {
 			<h1><?php echo esc_html( 'DCJ Free PDF Mailer' ); ?></h1>
 			
 			<div class="notice notice-info inline">
-				<p><?php echo esc_html( '現在のPDF設定は WordPress option に保存されています。第4-3段階では新規追加機能が実装されました。' ); ?></p>
+				<p><?php echo esc_html( 'PDF設定、メール送信設定、送信ログ、購読者リストをこの画面で管理できます。' ); ?></p>
 			</div>
 
 			<?php $this->render_mail_settings_form(); ?>
@@ -2276,7 +2276,7 @@ class DCJ_Free_PDF_Mailer {
 				<a class="button" href="<?php echo esc_url( $clear_url ); ?>" onclick="return confirm('<?php echo esc_attr( '送信ログをすべて削除します。元に戻せません。よろしいですか？' ); ?>');"><?php echo esc_html( '送信ログをすべて削除' ); ?></a>
 			<?php endif; ?>
 		</p>
-		<p><?php echo esc_html( '送信ログCSVは、フォーム送信履歴の確認用です。お知らせ配信・販売案内・クーポン案内に使うメールアドレスは、購読者リストで「購読中」に絞り込んでCSV出力してください。' ); ?></p>
+		<p><?php echo esc_html( '送信ログCSVは、フォーム送信履歴の確認用です。お知らせ配信・販売案内・クーポン案内には、購読者リストのメール配信用CSVを使用してください。' ); ?></p>
 		<p><?php echo esc_html( '現在の検索・絞り込み条件は送信ログCSVにも反映されます。' ); ?></p>
 		<form method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" style="margin: 1em 0;">
 			<input type="hidden" name="page" value="<?php echo esc_attr( self::PLUGIN_SLUG ); ?>">
@@ -2413,7 +2413,7 @@ class DCJ_Free_PDF_Mailer {
 			<a class="button button-secondary" href="<?php echo esc_url( $broadcast_export_ja_url ); ?>"><?php echo esc_html( '日本語メール配信用CSV出力' ); ?></a>
 			<a class="button button-secondary" href="<?php echo esc_url( $broadcast_export_en_url ); ?>"><?php echo esc_html( '英語メール配信用CSV出力' ); ?></a>
 		</p>
-		<p><?php echo esc_html( '管理・バックアップ用CSVは、購読者の確認・保管用です。現在の検索・絞り込み条件が反映されます。' ); ?></p>
+		<p><?php echo esc_html( '管理・バックアップ用CSVは、購読者リストの確認・保管用です。現在の検索・絞り込み条件が反映されます。' ); ?></p>
 		<p><?php echo esc_html( 'メール配信用CSVは、メール配信サービスへ手動インポートするためのCSVです。検索条件を反映し、購読中のメールアドレスのみを出力します。日本語・英語のみのCSVも出力できます。' ); ?></p>
 		<p><?php echo esc_html( 'お知らせ配信・販売案内・クーポン案内には、購読中のメールアドレスのみを使用してください。配信停止の方には送らないでください。' ); ?></p>
 		<p><?php echo esc_html( '削除前に必要に応じて管理・バックアップ用CSVを出力してください。削除した購読者は元に戻せません。' ); ?></p>
