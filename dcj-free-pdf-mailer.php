@@ -3,7 +3,7 @@
  * Plugin Name: DCJ Free PDF Mailer
  * Plugin URI: https://dreamcoloringjourney.com/
  * Description: Dream Coloring Journey の無料PDF配布フォーム用プラグインです。ショートコードIDごとに無料PDFメールを送信します。
- * Version: 0.3.0
+ * Version: 1.2.1
  * Author: 名富企画
  * Author URI: https://dreamcoloringjourney.com/
  * License: GPL2
