@@ -33,6 +33,7 @@ PDF settings are stored in WordPress options. The plugin does not create a custo
 - Newsletter opt-in status in submission logs and CSV export.
 - Subscriber list management.
 - Search and filter subscribers by email address and status.
+- Manual subscriber add from the admin screen. (v1.3.0 in development)
 - Subscriber CSV export.
 - Broadcast CSV export.
 - Export subscribed email addresses only for broadcast use.
@@ -121,6 +122,7 @@ Current status:
 - Subscriber status management is implemented.
 - Subscriber search/filtering and unsubscribe URL handling are implemented.
 - Broadcast CSV export for subscribed contacts is implemented, including all-language, Japanese-only, and English-only exports.
+- Manual subscriber add is implemented for v1.3.0 development. v1.3.0 is not released yet.
 
 This plugin is still project-specific and should be reviewed before reuse on unrelated sites.
 
