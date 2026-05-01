@@ -1248,6 +1248,7 @@ class DCJ_Free_PDF_Mailer {
 			<?php $this->render_mail_diagnostics(); ?>
 			
 			<h2><?php echo esc_html( 'PDF設定一覧' ); ?></h2>
+                        <p><?php echo esc_html( '登録済みの無料PDF設定を確認できます。ショートコードを固定ページや投稿に貼り付けると、申込フォームを表示できます。' ); ?></p>
 			
 			<table class="widefat striped">
 				<thead>
