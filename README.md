@@ -34,6 +34,7 @@ PDF settings are stored in WordPress options. The plugin does not create a custo
 - Subscriber list management.
 - Search and filter subscribers by email address and status.
 - Manual subscriber add from the admin screen. (v1.3.0 in development)
+- Subscriber CSV import with preview. (v1.3.0 in development)
 - Subscriber CSV export.
 - Broadcast CSV export.
 - Export subscribed email addresses only for broadcast use.
@@ -100,6 +101,8 @@ Clicking an unsubscribe URL changes the subscriber status to unsubscribed, but i
 
 CSV exports include email addresses, so store and share them carefully. Submission log CSV files are for checking form submission history and records. The subscriber list CSV remains available for subscriber management and backup.
 
+The v1.3.0 development version includes subscriber CSV import. Use it only for email addresses with confirmed consent. Already registered or unsubscribed email addresses are skipped, unsubscribed contacts are not automatically returned to subscribed, duplicate rows in the CSV are skipped, and invalid email addresses, invalid language values, or unconfirmed consent rows are skipped. Imported subscribers use the existing subscriber storage format and appear in the subscriber list and CSV exports.
+
 For future newsletters, product announcements, or coupons, use the broadcast CSV export. It is intended to help with manual import into an email marketing service and includes subscribed contacts only. Broadcast CSV files can be exported for all languages, Japanese only, or English only. Always check the CSV content, consent status, unsubscribed contacts, and the email marketing service settings before sending.
 
 reCAPTCHA v3 is optional. To use it, create v3 keys in the Google reCAPTCHA admin screen, register the actual domain where the form is installed, and enter the Site Key, Secret Key, and score threshold in the plugin settings. A threshold of `0.5` is a practical starting point; if valid submissions fail, try a lower value such as `0.3`. When reCAPTCHA is disabled, the form works as before.
@@ -123,6 +126,7 @@ Current status:
 - Subscriber search/filtering and unsubscribe URL handling are implemented.
 - Broadcast CSV export for subscribed contacts is implemented, including all-language, Japanese-only, and English-only exports.
 - Manual subscriber add is implemented for v1.3.0 development. v1.3.0 is not released yet.
+- Subscriber CSV import is implemented for v1.3.0 development. v1.3.0 is not released yet.
 
 This plugin is still project-specific and should be reviewed before reuse on unrelated sites.
 
