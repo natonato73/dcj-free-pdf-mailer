@@ -3,7 +3,7 @@
  * Plugin Name: DCJ Free PDF Mailer
  * Plugin URI: https://dreamcoloringjourney.com/
  * Description: Dream Coloring Journey の無料PDF配布フォーム用プラグインです。ショートコードIDごとに無料PDFメールを送信します。
- * Version: 1.2.2
+ * Version: 1.3.0
  * Author: 名富企画
  * Author URI: https://dreamcoloringjourney.com/
  * License: GPL2
@@ -723,6 +723,11 @@ class DCJ_Free_PDF_Mailer {
 			return new WP_Error( 'dcj_fpm_csv_email_missing', 'CSVに必須列 email がありません。' );
 		}
 
+		if ( ! isset( $header_map['lang'] ) ) {
+			fclose( $handle );
+			return new WP_Error( 'dcj_fpm_csv_lang_missing', 'CSVに必須列 lang がありません。' );
+		}
+
 		$subscribers       = get_option( self::OPTION_SUBSCRIBERS, array() );
 		$subscribers       = is_array( $subscribers ) ? $subscribers : array();
 		$existing_emails   = array();
@@ -768,7 +773,17 @@ class DCJ_Free_PDF_Mailer {
 				$lang = sanitize_key( $row[ $header_map['lang'] ] );
 			}
 
-			if ( ! in_array( $lang, array( '', 'ja', 'en' ), true ) ) {
+			if ( '' === $lang ) {
+				$preview['invalid_count']++;
+				$preview['errors'][] = array(
+					'line'   => $line_number,
+					'email'  => $email,
+					'reason' => '言語未指定',
+				);
+				continue;
+			}
+
+			if ( ! in_array( $lang, array( 'ja', 'en' ), true ) ) {
 				$preview['invalid_count']++;
 				$preview['errors'][] = array(
 					'line'   => $line_number,
@@ -2337,9 +2352,9 @@ class DCJ_Free_PDF_Mailer {
 			exit;
 		}
 
-		if ( ! in_array( $lang, array( '', 'ja', 'en' ), true ) ) {
-			set_transient( 'dcj_fpm_admin_error', '言語の選択値を確認してください。', 30 );
-			set_transient( 'dcj_fpm_manual_subscriber_error', '言語の選択値を確認してください。', 30 );
+		if ( ! in_array( $lang, array( 'ja', 'en' ), true ) ) {
+			set_transient( 'dcj_fpm_admin_error', '言語を選択してください。', 30 );
+			set_transient( 'dcj_fpm_manual_subscriber_error', '言語を選択してください。', 30 );
 			wp_safe_redirect( $redirect_url );
 			exit;
 		}
@@ -2547,7 +2562,7 @@ class DCJ_Free_PDF_Mailer {
 			$lang        = ! empty( $candidate['lang'] ) ? sanitize_key( $candidate['lang'] ) : '';
 			$source_note = ! empty( $candidate['source_note'] ) ? sanitize_text_field( $candidate['source_note'] ) : '';
 
-			if ( ! in_array( $lang, array( '', 'ja', 'en' ), true ) ) {
+			if ( ! in_array( $lang, array( 'ja', 'en' ), true ) ) {
 				$skipped++;
 				continue;
 			}
@@ -2941,7 +2956,7 @@ class DCJ_Free_PDF_Mailer {
 		<p><?php echo esc_html( 'メール配信用CSVは検索条件を反映し、購読中のみを出力します。全言語、日本語のみ、英語のみを選べます。配信停止の方には送らないでください。' ); ?></p>
 		<p><?php echo esc_html( '削除前に必要に応じて管理・バックアップ用CSVを出力してください。削除した購読者は元に戻せません。' ); ?></p>
 		<h3 id="dcj-manual-subscriber-add"><?php echo esc_html( '購読者を手動追加' ); ?></h3>
-		<p><?php echo esc_html( '同意確認済みのメールアドレスだけを1件ずつ追加できます。既に登録済み、または配信停止済みのメールアドレスは追加できません。' ); ?></p>
+		<p><?php echo esc_html( '同意確認済みのメールアドレスだけを1件ずつ追加できます。新規追加では言語の選択が必須です。既に登録済み、または配信停止済みのメールアドレスは追加できません。' ); ?></p>
 		<?php
 		$manual_subscriber_success = get_transient( 'dcj_fpm_manual_subscriber_success' );
 		$manual_subscriber_error   = get_transient( 'dcj_fpm_manual_subscriber_error' );
@@ -2966,9 +2981,9 @@ class DCJ_Free_PDF_Mailer {
 			<?php wp_nonce_field( 'dcj_fpm_add_subscriber', 'dcj_fpm_add_subscriber_nonce' ); ?>
 			<label for="dcj-manual-subscriber-email"><?php echo esc_html( 'メールアドレス' ); ?> *</label>
 			<input type="email" id="dcj-manual-subscriber-email" name="dcj_manual_subscriber_email" value="" required>
-			<label for="dcj-manual-subscriber-lang"><?php echo esc_html( '言語' ); ?></label>
-			<select id="dcj-manual-subscriber-lang" name="dcj_manual_subscriber_lang">
-				<option value=""><?php echo esc_html( '未指定' ); ?></option>
+			<label for="dcj-manual-subscriber-lang"><?php echo esc_html( '言語' ); ?> *</label>
+			<select id="dcj-manual-subscriber-lang" name="dcj_manual_subscriber_lang" required>
+				<option value="" selected disabled><?php echo esc_html( '選択してください' ); ?></option>
 				<option value="ja"><?php echo esc_html( '日本語' ); ?></option>
 				<option value="en"><?php echo esc_html( '英語' ); ?></option>
 			</select>
@@ -2981,7 +2996,7 @@ class DCJ_Free_PDF_Mailer {
 			<button type="submit" class="button button-secondary"><?php echo esc_html( '購読者を追加' ); ?></button>
 		</form>
 		<h3 id="dcj-subscriber-csv-import"><?php echo esc_html( '購読者CSVインポート' ); ?></h3>
-		<p><?php echo esc_html( '同意確認済みの購読者メールアドレスをCSVからまとめて登録できます。1行目はヘッダー、必須列は email、任意列は lang、source_note、consent_confirmed です。' ); ?></p>
+		<p><?php echo esc_html( '同意確認済みの購読者メールアドレスをCSVからまとめて登録できます。1行目はヘッダー、必須列は email と lang、任意列は source_note と consent_confirmed です。lang は ja または en が必須です。' ); ?></p>
 		<?php
 		$csv_import_success = get_transient( 'dcj_fpm_subscriber_csv_import_success' );
 		$csv_import_error   = get_transient( 'dcj_fpm_subscriber_csv_import_error' );
