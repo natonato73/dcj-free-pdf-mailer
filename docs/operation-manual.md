@@ -331,6 +331,51 @@ Already registered email addresses cannot be added again. Email addresses that a
 
 Manually added subscribers are stored in the same subscriber list format as form opt-ins. They are included in subscriber list display and CSV exports in the same way as other subscribers.
 
+### Subscriber CSV Import
+
+The v1.3.0 development version includes subscriber CSV import in the **購読者リスト** section. v1.3.0 has not been released yet.
+
+Use this feature only for email addresses with confirmed consent for email updates or similar communications.
+
+CSV format:
+
+- The first row must be a header row.
+- Required column: `email`.
+- Optional columns: `lang`, `source_note`, `consent_confirmed`.
+- `lang` can be `ja`, `en`, or blank.
+- If `consent_confirmed` exists, only rows with `yes`, `1`, or `true` are treated as confirmed.
+- If `consent_confirmed` does not exist, rows can still be import candidates when the admin confirmation checkboxes are checked.
+
+Steps:
+
+1. Open **DCJ Free PDF**.
+2. Go to **購読者リスト**.
+3. In **購読者CSVインポート**, select the CSV file.
+4. Check the two confirmation checkboxes.
+5. Click **プレビュー**.
+6. Check the read row count, planned import count, skipped counts, and error list.
+7. If the preview is correct, click **インポート実行**.
+
+Preview shows:
+
+- Read row count
+- Planned import count
+- Existing registered skip count
+- Duplicate row skip count
+- Invalid input count
+- Unconfirmed consent skip count
+- Error list with row number, email address, and reason
+
+Important notes:
+
+- Import only email addresses with confirmed consent.
+- Already registered email addresses are not added again.
+- Unsubscribed email addresses are treated as already registered and are not automatically returned to subscribed.
+- Duplicate email addresses inside the CSV are skipped.
+- Invalid email addresses, invalid language values, and unconfirmed consent rows are skipped.
+- The database structure is not changed.
+- Imported subscribers use the existing subscriber storage format and appear in the subscriber list, subscriber CSV export, and broadcast CSV export.
+
 ### Broadcast CSV Export
 
 Click **メール配信用CSV出力（全言語）**, **日本語メール配信用CSV出力**, or **英語メール配信用CSV出力** near the subscriber list to download a CSV intended for manual import into an email marketing service.
