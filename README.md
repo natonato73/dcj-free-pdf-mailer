@@ -33,8 +33,8 @@ PDF settings are stored in WordPress options. The plugin does not create a custo
 - Newsletter opt-in status in submission logs and CSV export.
 - Subscriber list management.
 - Search and filter subscribers by email address and status.
-- Manual subscriber add from the admin screen. (v1.3.0 in development)
-- Subscriber CSV import with preview. (v1.3.0 in development)
+- Manual subscriber add from the admin screen.
+- Subscriber CSV import with preview and execution confirmation.
 - Subscriber CSV export.
 - Broadcast CSV export.
 - Export subscribed email addresses only for broadcast use.
@@ -101,7 +101,9 @@ Clicking an unsubscribe URL changes the subscriber status to unsubscribed, but i
 
 CSV exports include email addresses, so store and share them carefully. Submission log CSV files are for checking form submission history and records. The subscriber list CSV remains available for subscriber management and backup.
 
-The v1.3.0 development version includes subscriber CSV import. Use it only for email addresses with confirmed consent. Already registered or unsubscribed email addresses are skipped, unsubscribed contacts are not automatically returned to subscribed, duplicate rows in the CSV are skipped, and invalid email addresses, invalid language values, or unconfirmed consent rows are skipped. Imported subscribers use the existing subscriber storage format and appear in the subscriber list and CSV exports.
+Subscriber CSV import is available for email addresses with confirmed consent. CSV files must include `email` and `lang`, and `lang` must be `ja` or `en`. Already registered or unsubscribed email addresses are skipped, unsubscribed contacts are not automatically returned to subscribed, duplicate rows in the CSV are skipped, and invalid email addresses, missing or invalid language values, or unconfirmed consent rows are skipped. Imported subscribers use the existing subscriber storage format and appear in the subscriber list and CSV exports.
+
+Manual subscriber add and subscriber CSV import require a language value of `ja` or `en` for new subscriber records. Existing subscriber records with a blank language value may remain for backward compatibility, but new blank language values are not added through these admin workflows.
 
 For future newsletters, product announcements, or coupons, use the broadcast CSV export. It is intended to help with manual import into an email marketing service and includes subscribed contacts only. Broadcast CSV files can be exported for all languages, Japanese only, or English only. Always check the CSV content, consent status, unsubscribed contacts, and the email marketing service settings before sending.
 
@@ -125,8 +127,8 @@ Current status:
 - Subscriber status management is implemented.
 - Subscriber search/filtering and unsubscribe URL handling are implemented.
 - Broadcast CSV export for subscribed contacts is implemented, including all-language, Japanese-only, and English-only exports.
-- Manual subscriber add is implemented for v1.3.0 development. v1.3.0 is not released yet.
-- Subscriber CSV import is implemented for v1.3.0 development. v1.3.0 is not released yet.
+- Manual subscriber add is implemented.
+- Subscriber CSV import with preview and execution confirmation is implemented.
 
 This plugin is still project-specific and should be reviewed before reuse on unrelated sites.
 

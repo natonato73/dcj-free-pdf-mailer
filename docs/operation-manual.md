@@ -306,14 +306,14 @@ Click **管理・バックアップ用CSV出力** to export the subscriber list 
 
 ### Manually Adding a Subscriber
 
-The v1.3.0 development version includes a manual add form in the **購読者リスト** section. v1.3.0 has not been released yet.
+The **購読者リスト** section includes a manual add form for adding one confirmed subscriber at a time.
 
 Use this form only when the email address has already been confirmed as opted in.
 
 Input fields:
 
 - Email address: required.
-- Language: `ja`, `en`, or blank.
+- Language: required. Select `ja` or `en`.
 - Source note: optional. This is saved as the source title, such as a memo for where consent was confirmed.
 - Consent confirmed checkbox: required.
 
@@ -322,7 +322,7 @@ Steps:
 1. Open **DCJ Free PDF**.
 2. Go to **購読者リスト**.
 3. Enter the email address.
-4. Select the language if needed.
+4. Select the language.
 5. Enter a source note if needed.
 6. Check **同意確認済み**.
 7. Click **購読者を追加**.
@@ -333,16 +333,16 @@ Manually added subscribers are stored in the same subscriber list format as form
 
 ### Subscriber CSV Import
 
-The v1.3.0 development version includes subscriber CSV import in the **購読者リスト** section. v1.3.0 has not been released yet.
+The **購読者リスト** section includes subscriber CSV import with preview and execution confirmation.
 
 Use this feature only for email addresses with confirmed consent for email updates or similar communications.
 
 CSV format:
 
 - The first row must be a header row.
-- Required column: `email`.
-- Optional columns: `lang`, `source_note`, `consent_confirmed`.
-- `lang` can be `ja`, `en`, or blank.
+- Required columns: `email`, `lang`.
+- Optional columns: `source_note`, `consent_confirmed`.
+- `lang` is required and must be `ja` or `en`.
 - If `consent_confirmed` exists, only rows with `yes`, `1`, or `true` are treated as confirmed.
 - If `consent_confirmed` does not exist, rows can still be import candidates when the admin confirmation checkboxes are checked.
 
@@ -372,9 +372,10 @@ Important notes:
 - Already registered email addresses are not added again.
 - Unsubscribed email addresses are treated as already registered and are not automatically returned to subscribed.
 - Duplicate email addresses inside the CSV are skipped.
-- Invalid email addresses, invalid language values, and unconfirmed consent rows are skipped.
+- Invalid email addresses, missing or invalid language values, and unconfirmed consent rows are skipped.
 - The database structure is not changed.
 - Imported subscribers use the existing subscriber storage format and appear in the subscriber list, subscriber CSV export, and broadcast CSV export.
+- Existing subscribers with a blank language value may remain for backward compatibility, but manual add and CSV import do not create new blank language values.
 
 ### Broadcast CSV Export
 
