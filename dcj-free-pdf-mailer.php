@@ -3,7 +3,7 @@
  * Plugin Name: DCJ Free PDF Mailer
  * Plugin URI: https://dreamcoloringjourney.com/
  * Description: Dream Coloring Journey の無料PDF配布フォーム用プラグインです。ショートコードIDごとに無料PDFメールを送信します。
- * Version: 1.4.0
+ * Version: 1.4.1
  * Author: 名富企画
  * Author URI: https://dreamcoloringjourney.com/
  * License: GPL2
@@ -33,7 +33,7 @@ class DCJ_Free_PDF_Mailer {
 	/**
 	 * プラグイン定数
 	 */
-	const VERSION                = '1.4.0';
+	const VERSION                = '1.4.1';
 	const PLUGIN_SLUG            = 'dcj-free-pdf-mailer';
 	const CSS_PREFIX             = 'dcj-fpm-';
 	const NONCE_ACTION           = 'dcj_free_pdf_submit';
@@ -3154,6 +3154,12 @@ class DCJ_Free_PDF_Mailer {
 			return $this->handle_admin_newsletter_broadcast_send();
 		}
 
+		if ( 'clear_preview' === $action ) {
+			$this->clear_current_newsletter_preview();
+			set_transient( 'dcj_fpm_admin_success', 'メルマガのプレビューをクリアしました。必要に応じて、件名・本文・送信対象を入力し直してください。', 30 );
+			return true;
+		}
+
 		if ( empty( $subject ) || empty( $body ) ) {
 			set_transient( 'dcj_fpm_admin_error', 'メルマガの件名と本文を入力してください。', 30 );
 			return false;
@@ -3289,6 +3295,7 @@ class DCJ_Free_PDF_Mailer {
 
 		$preview_token = get_transient( 'dcj_fpm_newsletter_preview_token_' . get_current_user_id() );
 		$preview       = ! empty( $preview_token ) ? get_transient( $this->get_newsletter_preview_transient_key( $preview_token ) ) : false;
+		$target_count  = is_array( $preview ) && isset( $preview['target_count'] ) ? absint( $preview['target_count'] ) : 0;
 
 		if ( is_array( $preview ) ) {
 			$posted_target  = ! empty( $preview['target'] ) ? sanitize_key( $preview['target'] ) : $posted_target;
@@ -3343,7 +3350,7 @@ class DCJ_Free_PDF_Mailer {
 					</tr>
 					<tr>
 						<th><?php echo esc_html( '対象購読者数' ); ?></th>
-						<td><?php echo esc_html( absint( $preview['target_count'] ) . '件' ); ?></td>
+						<td><?php echo esc_html( $target_count . '件' ); ?></td>
 					</tr>
 					<tr>
 						<th><?php echo esc_html( '件名' ); ?></th>
@@ -3355,7 +3362,11 @@ class DCJ_Free_PDF_Mailer {
 					</tr>
 				</tbody>
 			</table>
-			<?php if ( ! empty( $preview['target_count'] ) ) : ?>
+			<?php if ( 10 <= $target_count ) : ?>
+				<p style="color: #b32d2e; font-weight: 600;"><?php echo esc_html( '対象購読者が10件以上です。本送信前に内容と対象を慎重に確認してください。' ); ?></p>
+			<?php endif; ?>
+			<?php if ( ! empty( $target_count ) ) : ?>
+				<p><?php echo esc_html( '送信実行を押すと、対象購読者に実際にメールが送信されます。件名・本文・対象件数を必ず確認してください。' ); ?></p>
 				<form method="post" action="#dcj-newsletter-broadcast" style="margin: 1em 0;">
 					<?php wp_nonce_field( 'dcj_fpm_newsletter_broadcast', 'dcj_fpm_newsletter_nonce' ); ?>
 					<input type="hidden" name="dcj_fpm_newsletter_preview_token" value="<?php echo esc_attr( $preview_token ); ?>">
@@ -3364,6 +3375,11 @@ class DCJ_Free_PDF_Mailer {
 			<?php else : ?>
 				<p><?php echo esc_html( '対象購読者が0件のため、送信実行はできません。' ); ?></p>
 			<?php endif; ?>
+			<form method="post" action="#dcj-newsletter-broadcast" style="margin: 1em 0;">
+				<?php wp_nonce_field( 'dcj_fpm_newsletter_broadcast', 'dcj_fpm_newsletter_nonce' ); ?>
+				<button type="submit" class="button button-secondary" name="dcj_fpm_newsletter_action" value="clear_preview"><?php echo esc_html( 'プレビューをクリア' ); ?></button>
+				<span style="margin-left: 0.5em;"><?php echo esc_html( '現在のプレビューだけを削除し、通常入力状態に戻します。' ); ?></span>
+			</form>
 		<?php endif; ?>
 		<h3><?php echo esc_html( 'メルマガ送信ログ' ); ?></h3>
 		<?php if ( empty( $newsletter_logs ) ) : ?>
