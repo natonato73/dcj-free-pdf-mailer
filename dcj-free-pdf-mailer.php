@@ -3,7 +3,7 @@
  * Plugin Name: DCJ Free PDF Mailer
  * Plugin URI: https://dreamcoloringjourney.com/
  * Description: Dream Coloring Journey の無料PDF配布フォーム用プラグインです。ショートコードIDごとに無料PDFメールを送信します。
- * Version: 1.3.1
+ * Version: 1.3.2
  * Author: 名富企画
  * Author URI: https://dreamcoloringjourney.com/
  * License: GPL2
@@ -33,7 +33,7 @@ class DCJ_Free_PDF_Mailer {
 	/**
 	 * プラグイン定数
 	 */
-	const VERSION                = '1.3.1';
+	const VERSION                = '1.3.2';
 	const PLUGIN_SLUG            = 'dcj-free-pdf-mailer';
 	const CSS_PREFIX             = 'dcj-fpm-';
 	const NONCE_ACTION           = 'dcj_free_pdf_submit';
@@ -75,6 +75,7 @@ class DCJ_Free_PDF_Mailer {
 		add_action( 'admin_init', array( $this, 'handle_admin_download_subscriber_csv_template' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_add_subscriber' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_preview_subscriber_csv_import' ) );
+		add_action( 'admin_init', array( $this, 'handle_admin_clear_subscriber_csv_import_preview' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_run_subscriber_csv_import' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_update_subscriber_status' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_delete_subscriber' ) );
@@ -2539,6 +2540,52 @@ class DCJ_Free_PDF_Mailer {
 	}
 
 	/**
+	 * 購読者CSVインポートのプレビューをクリアします。
+	 */
+	public function handle_admin_clear_subscriber_csv_import_preview() {
+
+		if ( empty( $_POST['dcj_fpm_clear_subscriber_csv_import_preview'] ) ) {
+			return;
+		}
+
+		$redirect_url = $this->get_subscriber_csv_import_redirect_url();
+
+		if ( empty( $_POST['page'] ) || self::PLUGIN_SLUG !== sanitize_key( wp_unslash( $_POST['page'] ) ) ) {
+			return;
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'dcj-free-pdf-mailer' ) );
+		}
+
+		if ( empty( $_POST['dcj_fpm_clear_subscriber_csv_import_preview_nonce'] ) ) {
+			set_transient( 'dcj_fpm_admin_error', 'CSVプレビューのクリア確認に失敗しました。管理画面からもう一度お試しください。', 30 );
+			set_transient( 'dcj_fpm_subscriber_csv_import_error', 'CSVプレビューのクリア確認に失敗しました。管理画面からもう一度お試しください。', 30 );
+			wp_safe_redirect( $redirect_url );
+			exit;
+		}
+
+		$nonce = sanitize_text_field( wp_unslash( $_POST['dcj_fpm_clear_subscriber_csv_import_preview_nonce'] ) );
+		if ( ! wp_verify_nonce( $nonce, 'dcj_fpm_clear_subscriber_csv_import_preview' ) ) {
+			set_transient( 'dcj_fpm_admin_error', 'CSVプレビューのクリア確認に失敗しました。管理画面からもう一度お試しください。', 30 );
+			set_transient( 'dcj_fpm_subscriber_csv_import_error', 'CSVプレビューのクリア確認に失敗しました。管理画面からもう一度お試しください。', 30 );
+			wp_safe_redirect( $redirect_url );
+			exit;
+		}
+
+		$token = get_transient( 'dcj_fpm_subscriber_csv_import_preview_token_' . get_current_user_id() );
+		if ( ! empty( $token ) ) {
+			delete_transient( $this->get_subscriber_csv_import_transient_key( $token ) );
+		}
+		delete_transient( 'dcj_fpm_subscriber_csv_import_preview_token_' . get_current_user_id() );
+
+		set_transient( 'dcj_fpm_subscriber_csv_import_success', 'CSVプレビューをクリアしました。必要に応じて、別のCSVファイルを選んでプレビューしてください。', 30 );
+
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
+
+	/**
 	 * 購読者CSVインポートを実行します。
 	 */
 	public function handle_admin_run_subscriber_csv_import() {
@@ -3174,6 +3221,13 @@ class DCJ_Free_PDF_Mailer {
 			<?php else : ?>
 				<p><?php echo esc_html( '登録予定のメールアドレスがないため、インポート実行はできません。' ); ?></p>
 			<?php endif; ?>
+			<form method="post" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" style="margin: 1em 0;">
+				<input type="hidden" name="page" value="<?php echo esc_attr( self::PLUGIN_SLUG ); ?>">
+				<input type="hidden" name="dcj_fpm_clear_subscriber_csv_import_preview" value="1">
+				<?php wp_nonce_field( 'dcj_fpm_clear_subscriber_csv_import_preview', 'dcj_fpm_clear_subscriber_csv_import_preview_nonce' ); ?>
+				<button type="submit" class="button button-secondary"><?php echo esc_html( 'プレビューをクリア' ); ?></button>
+				<span style="margin-left: 0.5em;"><?php echo esc_html( '選んだCSVをやり直したい場合は、プレビューを消して最初から確認できます。' ); ?></span>
+			</form>
 		<?php endif; ?>
 		<form method="get" action="<?php echo esc_url( admin_url( 'admin.php' ) ); ?>" style="margin: 1em 0;">
 			<input type="hidden" name="page" value="<?php echo esc_attr( self::PLUGIN_SLUG ); ?>">
