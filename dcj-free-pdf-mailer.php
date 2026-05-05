@@ -3,7 +3,7 @@
  * Plugin Name: DCJ Free PDF Mailer
  * Plugin URI: https://dreamcoloringjourney.com/
  * Description: Dream Coloring Journey の無料PDF配布フォーム用プラグインです。ショートコードIDごとに無料PDFメールを送信します。
- * Version: 1.5.1
+ * Version: 1.5.2
  * Author: 名富企画
  * Author URI: https://dreamcoloringjourney.com/
  * License: GPL2
@@ -33,7 +33,7 @@ class DCJ_Free_PDF_Mailer {
 	/**
 	 * プラグイン定数
 	 */
-	const VERSION                     = '1.5.1';
+	const VERSION                     = '1.5.2';
 	const PLUGIN_SLUG                 = 'dcj-free-pdf-mailer';
 	const CSS_PREFIX                  = 'dcj-fpm-';
 	const NONCE_ACTION                = 'dcj_free_pdf_submit';
@@ -3236,6 +3236,35 @@ class DCJ_Free_PDF_Mailer {
 			return true;
 		}
 
+		if ( 'duplicate_template' === $action ) {
+			$template_id = ! empty( $_POST['dcj_fpm_newsletter_template_id'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_fpm_newsletter_template_id'] ) ) : '';
+			$template    = $this->get_newsletter_template_by_id( $template_id );
+
+			if ( empty( $template ) || ! is_array( $template ) ) {
+				set_transient( 'dcj_fpm_admin_error', '複製するメルマガテンプレートを確認できませんでした。', 30 );
+				return false;
+			}
+
+			$template_target = ! empty( $template['target'] ) ? sanitize_key( $template['target'] ) : 'all';
+			$template_target = in_array( $template_target, array( 'all', 'ja', 'en' ), true ) ? $template_target : 'all';
+			$templates       = $this->get_newsletter_templates();
+			array_unshift(
+				$templates,
+				array(
+					'id'         => wp_generate_password( 16, false, false ),
+					'name'       => ( ! empty( $template['name'] ) ? sanitize_text_field( $template['name'] ) : '' ) . ' コピー',
+					'target'     => $template_target,
+					'subject'    => ! empty( $template['subject'] ) ? sanitize_text_field( $template['subject'] ) : '',
+					'body'       => ! empty( $template['body'] ) ? sanitize_textarea_field( $template['body'] ) : '',
+					'updated_at' => current_time( 'mysql' ),
+				)
+			);
+
+			$this->update_newsletter_templates( array_slice( $templates, 0, 50 ) );
+			set_transient( 'dcj_fpm_admin_success', 'メルマガテンプレートを複製しました。', 30 );
+			return true;
+		}
+
 		if ( 'delete_template' === $action ) {
 			$template_id = ! empty( $_POST['dcj_fpm_newsletter_template_id'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_fpm_newsletter_template_id'] ) ) : '';
 			$templates   = $this->get_newsletter_templates();
@@ -3576,6 +3605,11 @@ class DCJ_Free_PDF_Mailer {
 									<?php wp_nonce_field( 'dcj_fpm_newsletter_broadcast', 'dcj_fpm_newsletter_nonce' ); ?>
 									<input type="hidden" name="dcj_fpm_newsletter_template_id" value="<?php echo esc_attr( $template_id ); ?>">
 									<button type="submit" class="button button-secondary" name="dcj_fpm_newsletter_action" value="edit_template"><?php echo esc_html( '編集' ); ?></button>
+								</form>
+								<form method="post" action="#dcj-newsletter-broadcast" style="display: inline-block; margin: 0 0.5em 0 0;">
+									<?php wp_nonce_field( 'dcj_fpm_newsletter_broadcast', 'dcj_fpm_newsletter_nonce' ); ?>
+									<input type="hidden" name="dcj_fpm_newsletter_template_id" value="<?php echo esc_attr( $template_id ); ?>">
+									<button type="submit" class="button button-secondary" name="dcj_fpm_newsletter_action" value="duplicate_template"><?php echo esc_html( '複製' ); ?></button>
 								</form>
 								<form method="post" action="#dcj-newsletter-broadcast" style="display: inline-block; margin: 0;">
 									<?php wp_nonce_field( 'dcj_fpm_newsletter_broadcast', 'dcj_fpm_newsletter_nonce' ); ?>
