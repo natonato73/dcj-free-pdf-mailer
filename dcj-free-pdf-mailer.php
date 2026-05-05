@@ -3,7 +3,7 @@
  * Plugin Name: DCJ Free PDF Mailer
  * Plugin URI: https://dreamcoloringjourney.com/
  * Description: Dream Coloring Journey の無料PDF配布フォーム用プラグインです。ショートコードIDごとに無料PDFメールを送信します。
- * Version: 1.5.0
+ * Version: 1.5.1
  * Author: 名富企画
  * Author URI: https://dreamcoloringjourney.com/
  * License: GPL2
@@ -33,7 +33,7 @@ class DCJ_Free_PDF_Mailer {
 	/**
 	 * プラグイン定数
 	 */
-	const VERSION                     = '1.5.0';
+	const VERSION                     = '1.5.1';
 	const PLUGIN_SLUG                 = 'dcj-free-pdf-mailer';
 	const CSS_PREFIX                  = 'dcj-fpm-';
 	const NONCE_ACTION                = 'dcj_free_pdf_submit';
@@ -3209,8 +3209,30 @@ class DCJ_Free_PDF_Mailer {
 			}
 
 			$this->clear_current_newsletter_preview();
+			delete_transient( 'dcj_fpm_newsletter_editing_template_' . get_current_user_id() );
 			set_transient( 'dcj_fpm_newsletter_loaded_template_' . get_current_user_id(), $template, 30 );
 			set_transient( 'dcj_fpm_admin_success', 'メルマガテンプレートを送信フォームに反映しました。内容を確認してからテスト送信またはプレビューしてください。', 30 );
+			return true;
+		}
+
+		if ( 'edit_template' === $action ) {
+			$template_id = ! empty( $_POST['dcj_fpm_newsletter_template_id'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_fpm_newsletter_template_id'] ) ) : '';
+			$template    = $this->get_newsletter_template_by_id( $template_id );
+
+			if ( empty( $template ) || ! is_array( $template ) ) {
+				set_transient( 'dcj_fpm_admin_error', '編集するメルマガテンプレートを確認できませんでした。', 30 );
+				return false;
+			}
+
+			$this->clear_current_newsletter_preview();
+			set_transient( 'dcj_fpm_newsletter_editing_template_' . get_current_user_id(), $template, 30 * MINUTE_IN_SECONDS );
+			set_transient( 'dcj_fpm_admin_success', 'メルマガテンプレートを編集フォームに読み込みました。', 30 );
+			return true;
+		}
+
+		if ( 'cancel_template_edit' === $action ) {
+			delete_transient( 'dcj_fpm_newsletter_editing_template_' . get_current_user_id() );
+			set_transient( 'dcj_fpm_admin_success', 'メルマガテンプレートの編集をキャンセルしました。', 30 );
 			return true;
 		}
 
@@ -3233,6 +3255,10 @@ class DCJ_Free_PDF_Mailer {
 			}
 
 			$this->update_newsletter_templates( $templates );
+			$editing_template = get_transient( 'dcj_fpm_newsletter_editing_template_' . get_current_user_id() );
+			if ( is_array( $editing_template ) && ! empty( $editing_template['id'] ) && $template_id === $editing_template['id'] ) {
+				delete_transient( 'dcj_fpm_newsletter_editing_template_' . get_current_user_id() );
+			}
 			set_transient( 'dcj_fpm_admin_success', 'メルマガテンプレートを削除しました。購読者DBと送信ログは変更していません。', 30 );
 			return true;
 		}
@@ -3244,6 +3270,7 @@ class DCJ_Free_PDF_Mailer {
 
 		if ( 'save_template' === $action ) {
 			$template_name = ! empty( $_POST['dcj_fpm_newsletter_template_name'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_fpm_newsletter_template_name'] ) ) : '';
+			$template_edit_id = ! empty( $_POST['dcj_fpm_newsletter_template_edit_id'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_fpm_newsletter_template_edit_id'] ) ) : '';
 
 			if ( empty( $template_name ) ) {
 				set_transient( 'dcj_fpm_admin_error', '保存するメルマガテンプレート名を入力してください。', 30 );
@@ -3253,6 +3280,34 @@ class DCJ_Free_PDF_Mailer {
 			$this->clear_current_newsletter_preview();
 
 			$templates = $this->get_newsletter_templates();
+			if ( ! empty( $template_edit_id ) ) {
+				$updated = false;
+				foreach ( $templates as $index => $template ) {
+					if ( ! empty( $template['id'] ) && $template_edit_id === $template['id'] ) {
+						$templates[ $index ] = array(
+							'id'         => $template_edit_id,
+							'name'       => $template_name,
+							'target'     => $target,
+							'subject'    => $subject,
+							'body'       => $body,
+							'updated_at' => current_time( 'mysql' ),
+						);
+						$updated = true;
+						break;
+					}
+				}
+
+				if ( ! $updated ) {
+					set_transient( 'dcj_fpm_admin_error', '更新するメルマガテンプレートを確認できませんでした。', 30 );
+					return false;
+				}
+
+				$this->update_newsletter_templates( $templates );
+				delete_transient( 'dcj_fpm_newsletter_editing_template_' . get_current_user_id() );
+				set_transient( 'dcj_fpm_admin_success', 'メルマガテンプレートを更新しました。', 30 );
+				return true;
+			}
+
 			array_unshift(
 				$templates,
 				array(
@@ -3397,6 +3452,8 @@ class DCJ_Free_PDF_Mailer {
 		$posted_subject = ! empty( $_POST['dcj_fpm_newsletter_subject'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_fpm_newsletter_subject'] ) ) : '';
 		$posted_body    = ! empty( $_POST['dcj_fpm_newsletter_body'] ) ? sanitize_textarea_field( wp_unslash( $_POST['dcj_fpm_newsletter_body'] ) ) : '';
 		$posted_test_to = ! empty( $_POST['dcj_fpm_newsletter_test_to'] ) ? sanitize_email( wp_unslash( $_POST['dcj_fpm_newsletter_test_to'] ) ) : '';
+		$template_name  = ! empty( $_POST['dcj_fpm_newsletter_template_name'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_fpm_newsletter_template_name'] ) ) : '';
+		$template_edit_id = ! empty( $_POST['dcj_fpm_newsletter_template_edit_id'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_fpm_newsletter_template_edit_id'] ) ) : '';
 
 		$loaded_template = get_transient( 'dcj_fpm_newsletter_loaded_template_' . get_current_user_id() );
 		if ( is_array( $loaded_template ) ) {
@@ -3405,6 +3462,16 @@ class DCJ_Free_PDF_Mailer {
 			$posted_subject = ! empty( $loaded_template['subject'] ) ? sanitize_text_field( $loaded_template['subject'] ) : '';
 			$posted_body    = ! empty( $loaded_template['body'] ) ? sanitize_textarea_field( $loaded_template['body'] ) : '';
 			delete_transient( 'dcj_fpm_newsletter_loaded_template_' . get_current_user_id() );
+		}
+
+		$editing_template = get_transient( 'dcj_fpm_newsletter_editing_template_' . get_current_user_id() );
+		if ( is_array( $editing_template ) && ! empty( $editing_template['id'] ) ) {
+			$template_edit_id = sanitize_text_field( $editing_template['id'] );
+			$template_name    = ! empty( $editing_template['name'] ) ? sanitize_text_field( $editing_template['name'] ) : '';
+			$posted_target    = ! empty( $editing_template['target'] ) ? sanitize_key( $editing_template['target'] ) : $posted_target;
+			$posted_target    = in_array( $posted_target, array( 'all', 'ja', 'en' ), true ) ? $posted_target : 'all';
+			$posted_subject   = ! empty( $editing_template['subject'] ) ? sanitize_text_field( $editing_template['subject'] ) : '';
+			$posted_body      = ! empty( $editing_template['body'] ) ? sanitize_textarea_field( $editing_template['body'] ) : '';
 		}
 
 		$preview_token = get_transient( 'dcj_fpm_newsletter_preview_token_' . get_current_user_id() );
@@ -3424,8 +3491,12 @@ class DCJ_Free_PDF_Mailer {
 		?>
 		<h2 id="dcj-newsletter-broadcast"><?php echo esc_html( 'メルマガ送信' ); ?></h2>
 		<p><?php echo esc_html( '購読中のメールアドレスに、手動でメルマガを送信できます。まずテスト送信またはプレビューで内容を確認してから送信してください。' ); ?></p>
+		<?php if ( ! empty( $template_edit_id ) ) : ?>
+			<p style="font-weight: 600;"><?php echo esc_html( '現在、テンプレート「' . $template_name . '」を編集中です。' ); ?></p>
+		<?php endif; ?>
 		<form method="post" action="#dcj-newsletter-broadcast" style="margin: 1em 0;">
 			<?php wp_nonce_field( 'dcj_fpm_newsletter_broadcast', 'dcj_fpm_newsletter_nonce' ); ?>
+			<input type="hidden" name="dcj_fpm_newsletter_template_edit_id" value="<?php echo esc_attr( $template_edit_id ); ?>">
 			<table class="form-table">
 				<tr>
 					<th scope="row"><label for="dcj-fpm-newsletter-target"><?php echo esc_html( '送信対象' ); ?></label></th>
@@ -3452,7 +3523,7 @@ class DCJ_Free_PDF_Mailer {
 				<tr>
 					<th scope="row"><label for="dcj-fpm-newsletter-template-name"><?php echo esc_html( 'テンプレート名' ); ?></label></th>
 					<td>
-						<input type="text" id="dcj-fpm-newsletter-template-name" name="dcj_fpm_newsletter_template_name" value="" class="regular-text">
+						<input type="text" id="dcj-fpm-newsletter-template-name" name="dcj_fpm_newsletter_template_name" value="<?php echo esc_attr( $template_name ); ?>" class="regular-text">
 						<p class="description"><?php echo esc_html( '現在の送信対象・件名・本文をテンプレートとして保存する場合だけ入力してください。' ); ?></p>
 					</td>
 				</tr>
@@ -3460,7 +3531,10 @@ class DCJ_Free_PDF_Mailer {
 			<p>
 				<button type="submit" class="button button-secondary" name="dcj_fpm_newsletter_action" value="test"><?php echo esc_html( 'テスト送信' ); ?></button>
 				<button type="submit" class="button button-primary" name="dcj_fpm_newsletter_action" value="preview"><?php echo esc_html( 'プレビュー' ); ?></button>
-				<button type="submit" class="button button-secondary" name="dcj_fpm_newsletter_action" value="save_template"><?php echo esc_html( 'テンプレート保存' ); ?></button>
+				<button type="submit" class="button button-secondary" name="dcj_fpm_newsletter_action" value="save_template"><?php echo esc_html( ! empty( $template_edit_id ) ? 'テンプレートを更新' : 'テンプレートを保存' ); ?></button>
+				<?php if ( ! empty( $template_edit_id ) ) : ?>
+					<button type="submit" class="button button-secondary" name="dcj_fpm_newsletter_action" value="cancel_template_edit"><?php echo esc_html( '編集をキャンセル' ); ?></button>
+				<?php endif; ?>
 			</p>
 		</form>
 		<h3><?php echo esc_html( 'メルマガテンプレート' ); ?></h3>
@@ -3497,6 +3571,11 @@ class DCJ_Free_PDF_Mailer {
 									<?php wp_nonce_field( 'dcj_fpm_newsletter_broadcast', 'dcj_fpm_newsletter_nonce' ); ?>
 									<input type="hidden" name="dcj_fpm_newsletter_template_id" value="<?php echo esc_attr( $template_id ); ?>">
 									<button type="submit" class="button button-secondary" name="dcj_fpm_newsletter_action" value="use_template"><?php echo esc_html( 'このテンプレートを使う' ); ?></button>
+								</form>
+								<form method="post" action="#dcj-newsletter-broadcast" style="display: inline-block; margin: 0 0.5em 0 0;">
+									<?php wp_nonce_field( 'dcj_fpm_newsletter_broadcast', 'dcj_fpm_newsletter_nonce' ); ?>
+									<input type="hidden" name="dcj_fpm_newsletter_template_id" value="<?php echo esc_attr( $template_id ); ?>">
+									<button type="submit" class="button button-secondary" name="dcj_fpm_newsletter_action" value="edit_template"><?php echo esc_html( '編集' ); ?></button>
 								</form>
 								<form method="post" action="#dcj-newsletter-broadcast" style="display: inline-block; margin: 0;">
 									<?php wp_nonce_field( 'dcj_fpm_newsletter_broadcast', 'dcj_fpm_newsletter_nonce' ); ?>
