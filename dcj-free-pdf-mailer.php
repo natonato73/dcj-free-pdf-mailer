@@ -3,7 +3,7 @@
  * Plugin Name: DCJ Free PDF Mailer
  * Plugin URI: https://dreamcoloringjourney.com/
  * Description: Dream Coloring Journey の無料PDF配布フォーム用プラグインです。ショートコードIDごとに無料PDFメールを送信します。
- * Version: 1.3.0
+ * Version: 1.3.1
  * Author: 名富企画
  * Author URI: https://dreamcoloringjourney.com/
  * License: GPL2
@@ -33,7 +33,7 @@ class DCJ_Free_PDF_Mailer {
 	/**
 	 * プラグイン定数
 	 */
-	const VERSION                = '0.3.0';
+	const VERSION                = '1.3.1';
 	const PLUGIN_SLUG            = 'dcj-free-pdf-mailer';
 	const CSS_PREFIX             = 'dcj-fpm-';
 	const NONCE_ACTION           = 'dcj_free_pdf_submit';
@@ -72,6 +72,7 @@ class DCJ_Free_PDF_Mailer {
 		add_action( 'admin_init', array( $this, 'handle_admin_export_optin_subscribers' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_export_subscribers' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_export_broadcast_subscribers' ) );
+		add_action( 'admin_init', array( $this, 'handle_admin_download_subscriber_csv_template' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_add_subscriber' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_preview_subscriber_csv_import' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_run_subscriber_csv_import' ) );
@@ -669,6 +670,24 @@ class DCJ_Free_PDF_Mailer {
 		$value = strtolower( trim( sanitize_text_field( (string) $value ) ) );
 
 		return in_array( $value, array( 'yes', '1', 'true' ), true );
+	}
+
+	/**
+	 * 言語が未設定の購読者数を取得します。
+	 *
+	 * @return int
+	 */
+	private function count_subscribers_without_lang() {
+
+		$count = 0;
+
+		foreach ( $this->get_subscribers( 0 ) as $subscriber ) {
+			if ( ! is_array( $subscriber ) || empty( $subscriber['lang'] ) ) {
+				$count++;
+			}
+		}
+
+		return $count;
 	}
 
 	/**
@@ -2302,6 +2321,41 @@ class DCJ_Free_PDF_Mailer {
 	}
 
 	/**
+	 * 購読者CSVインポート用テンプレートを出力します。
+	 */
+	public function handle_admin_download_subscriber_csv_template() {
+
+		if ( empty( $_GET['dcj_fpm_action'] ) || 'download_subscriber_csv_template' !== sanitize_key( wp_unslash( $_GET['dcj_fpm_action'] ) ) ) {
+			return;
+		}
+
+		if ( empty( $_GET['page'] ) || self::PLUGIN_SLUG !== sanitize_key( wp_unslash( $_GET['page'] ) ) ) {
+			return;
+		}
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'dcj-free-pdf-mailer' ) );
+		}
+
+		if ( empty( $_GET['dcj_fpm_subscriber_csv_template_nonce'] ) ) {
+			wp_die( esc_html( 'CSVテンプレート出力の確認に失敗しました。管理画面からもう一度お試しください。' ) );
+		}
+
+		$nonce = sanitize_text_field( wp_unslash( $_GET['dcj_fpm_subscriber_csv_template_nonce'] ) );
+		if ( ! wp_verify_nonce( $nonce, 'dcj_fpm_download_subscriber_csv_template' ) ) {
+			wp_die( esc_html( 'CSVテンプレート出力の確認に失敗しました。管理画面からもう一度お試しください。' ) );
+		}
+
+		$rows = array(
+			array( 'email', 'name', 'lang', 'status' ),
+			array( 'sample@example.com', '山田太郎', 'ja', 'active' ),
+			array( 'sample-en@example.com', 'John Smith', 'en', 'active' ),
+		);
+
+		DCJ_FPM_CSV_Exporter::output_csv( 'dcj-free-pdf-subscriber-import-template.csv', $rows );
+	}
+
+	/**
 	 * 購読者を手動追加します。
 	 */
 	public function handle_admin_add_subscriber() {
@@ -2353,15 +2407,15 @@ class DCJ_Free_PDF_Mailer {
 		}
 
 		if ( ! in_array( $lang, array( 'ja', 'en' ), true ) ) {
-			set_transient( 'dcj_fpm_admin_error', '言語を選択してください。', 30 );
-			set_transient( 'dcj_fpm_manual_subscriber_error', '言語を選択してください。', 30 );
+			set_transient( 'dcj_fpm_admin_error', '言語を選択してください。日本語は ja、英語は en として保存されます。', 30 );
+			set_transient( 'dcj_fpm_manual_subscriber_error', '言語を選択してください。日本語は ja、英語は en として保存されます。', 30 );
 			wp_safe_redirect( $redirect_url );
 			exit;
 		}
 
 		if ( empty( $_POST['dcj_manual_subscriber_consent_confirmed'] ) || '1' !== sanitize_text_field( wp_unslash( $_POST['dcj_manual_subscriber_consent_confirmed'] ) ) ) {
-			set_transient( 'dcj_fpm_admin_error', '同意確認済みにチェックを入れてください。', 30 );
-			set_transient( 'dcj_fpm_manual_subscriber_error', '同意確認済みにチェックを入れてください。', 30 );
+			set_transient( 'dcj_fpm_admin_error', '同意確認済みのメールアドレスだけ追加できます。確認チェックを入れてください。', 30 );
+			set_transient( 'dcj_fpm_manual_subscriber_error', '同意確認済みのメールアドレスだけ追加できます。確認チェックを入れてください。', 30 );
 			wp_safe_redirect( $redirect_url );
 			exit;
 		}
@@ -2370,8 +2424,8 @@ class DCJ_Free_PDF_Mailer {
 		$subscribers = is_array( $subscribers ) ? $subscribers : array();
 
 		if ( isset( $subscribers[ $email ] ) ) {
-			set_transient( 'dcj_fpm_admin_error', '既に登録済み、または配信停止済みです。', 30 );
-			set_transient( 'dcj_fpm_manual_subscriber_error', '既に登録済み、または配信停止済みです。', 30 );
+			set_transient( 'dcj_fpm_admin_error', 'このメールアドレスは既に登録済み、または配信停止済みのため追加できません。', 30 );
+			set_transient( 'dcj_fpm_manual_subscriber_error', 'このメールアドレスは既に登録済み、または配信停止済みのため追加できません。', 30 );
 			wp_safe_redirect( $redirect_url );
 			exit;
 		}
@@ -2389,11 +2443,11 @@ class DCJ_Free_PDF_Mailer {
 		);
 
 		if ( update_option( self::OPTION_SUBSCRIBERS, $subscribers ) ) {
-			set_transient( 'dcj_fpm_admin_success', '購読者を手動追加しました。', 30 );
-			set_transient( 'dcj_fpm_manual_subscriber_success', '購読者を手動追加しました。', 30 );
+			set_transient( 'dcj_fpm_admin_success', '購読者を1件追加しました。', 30 );
+			set_transient( 'dcj_fpm_manual_subscriber_success', '購読者を1件追加しました。', 30 );
 		} else {
-			set_transient( 'dcj_fpm_admin_error', '購読者の追加に失敗しました。', 30 );
-			set_transient( 'dcj_fpm_manual_subscriber_error', '購読者の追加に失敗しました。', 30 );
+			set_transient( 'dcj_fpm_admin_error', '購読者を追加できませんでした。入力内容を確認してもう一度お試しください。', 30 );
+			set_transient( 'dcj_fpm_manual_subscriber_error', '購読者を追加できませんでした。入力内容を確認してもう一度お試しください。', 30 );
 		}
 
 		wp_safe_redirect( $redirect_url );
@@ -2420,16 +2474,16 @@ class DCJ_Free_PDF_Mailer {
 		}
 
 		if ( empty( $_POST['dcj_fpm_subscriber_csv_import_nonce'] ) ) {
-			set_transient( 'dcj_fpm_admin_error', '購読者CSVインポートの確認に失敗しました。', 30 );
-			set_transient( 'dcj_fpm_subscriber_csv_import_error', '購読者CSVインポートの確認に失敗しました。', 30 );
+			set_transient( 'dcj_fpm_admin_error', 'CSVインポートの確認に失敗しました。管理画面からもう一度お試しください。', 30 );
+			set_transient( 'dcj_fpm_subscriber_csv_import_error', 'CSVインポートの確認に失敗しました。管理画面からもう一度お試しください。', 30 );
 			wp_safe_redirect( $redirect_url );
 			exit;
 		}
 
 		$nonce = sanitize_text_field( wp_unslash( $_POST['dcj_fpm_subscriber_csv_import_nonce'] ) );
 		if ( ! wp_verify_nonce( $nonce, 'dcj_fpm_subscriber_csv_import' ) ) {
-			set_transient( 'dcj_fpm_admin_error', '購読者CSVインポートの確認に失敗しました。', 30 );
-			set_transient( 'dcj_fpm_subscriber_csv_import_error', '購読者CSVインポートの確認に失敗しました。', 30 );
+			set_transient( 'dcj_fpm_admin_error', 'CSVインポートの確認に失敗しました。管理画面からもう一度お試しください。', 30 );
+			set_transient( 'dcj_fpm_subscriber_csv_import_error', 'CSVインポートの確認に失敗しました。管理画面からもう一度お試しください。', 30 );
 			wp_safe_redirect( $redirect_url );
 			exit;
 		}
@@ -2438,15 +2492,15 @@ class DCJ_Free_PDF_Mailer {
 		$unsubscribe_check = ! empty( $_POST['dcj_subscriber_csv_unsubscribe_understood'] ) && '1' === sanitize_text_field( wp_unslash( $_POST['dcj_subscriber_csv_unsubscribe_understood'] ) );
 
 		if ( ! $consent_confirmed || ! $unsubscribe_check ) {
-			set_transient( 'dcj_fpm_admin_error', 'CSVインポート前の確認チェックを入れてください。', 30 );
-			set_transient( 'dcj_fpm_subscriber_csv_import_error', 'CSVインポート前の確認チェックを入れてください。', 30 );
+			set_transient( 'dcj_fpm_admin_error', 'CSVインポート前に、同意確認と配信停止済みアドレスの確認チェックを入れてください。', 30 );
+			set_transient( 'dcj_fpm_subscriber_csv_import_error', 'CSVインポート前に、同意確認と配信停止済みアドレスの確認チェックを入れてください。', 30 );
 			wp_safe_redirect( $redirect_url );
 			exit;
 		}
 
 		if ( empty( $_FILES['dcj_subscriber_csv_file'] ) || empty( $_FILES['dcj_subscriber_csv_file']['tmp_name'] ) ) {
-			set_transient( 'dcj_fpm_admin_error', 'CSVファイルを選択してください。', 30 );
-			set_transient( 'dcj_fpm_subscriber_csv_import_error', 'CSVファイルを選択してください。', 30 );
+			set_transient( 'dcj_fpm_admin_error', 'インポートするCSVファイルを選択してください。', 30 );
+			set_transient( 'dcj_fpm_subscriber_csv_import_error', 'インポートするCSVファイルを選択してください。', 30 );
 			wp_safe_redirect( $redirect_url );
 			exit;
 		}
@@ -2478,7 +2532,7 @@ class DCJ_Free_PDF_Mailer {
 		$preview['token'] = $token;
 		set_transient( $this->get_subscriber_csv_import_transient_key( $token ), $preview, 30 * MINUTE_IN_SECONDS );
 		set_transient( 'dcj_fpm_subscriber_csv_import_preview_token_' . get_current_user_id(), $token, 30 * MINUTE_IN_SECONDS );
-		set_transient( 'dcj_fpm_subscriber_csv_import_success', 'CSVインポートのプレビューを作成しました。内容を確認してから実行してください。', 30 );
+		set_transient( 'dcj_fpm_subscriber_csv_import_success', 'CSVのプレビューを作成しました。登録予定件数とエラー一覧を確認してから、インポートを実行してください。', 30 );
 
 		wp_safe_redirect( $redirect_url );
 		exit;
@@ -2504,24 +2558,24 @@ class DCJ_Free_PDF_Mailer {
 		}
 
 		if ( empty( $_POST['dcj_fpm_run_subscriber_csv_import_nonce'] ) ) {
-			set_transient( 'dcj_fpm_admin_error', '購読者CSVインポート実行の確認に失敗しました。', 30 );
-			set_transient( 'dcj_fpm_subscriber_csv_import_error', '購読者CSVインポート実行の確認に失敗しました。', 30 );
+			set_transient( 'dcj_fpm_admin_error', 'CSVインポート実行の確認に失敗しました。もう一度プレビューからお試しください。', 30 );
+			set_transient( 'dcj_fpm_subscriber_csv_import_error', 'CSVインポート実行の確認に失敗しました。もう一度プレビューからお試しください。', 30 );
 			wp_safe_redirect( $redirect_url );
 			exit;
 		}
 
 		$nonce = sanitize_text_field( wp_unslash( $_POST['dcj_fpm_run_subscriber_csv_import_nonce'] ) );
 		if ( ! wp_verify_nonce( $nonce, 'dcj_fpm_run_subscriber_csv_import' ) ) {
-			set_transient( 'dcj_fpm_admin_error', '購読者CSVインポート実行の確認に失敗しました。', 30 );
-			set_transient( 'dcj_fpm_subscriber_csv_import_error', '購読者CSVインポート実行の確認に失敗しました。', 30 );
+			set_transient( 'dcj_fpm_admin_error', 'CSVインポート実行の確認に失敗しました。もう一度プレビューからお試しください。', 30 );
+			set_transient( 'dcj_fpm_subscriber_csv_import_error', 'CSVインポート実行の確認に失敗しました。もう一度プレビューからお試しください。', 30 );
 			wp_safe_redirect( $redirect_url );
 			exit;
 		}
 
 		$token = ! empty( $_POST['dcj_subscriber_csv_import_token'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_subscriber_csv_import_token'] ) ) : '';
 		if ( empty( $token ) ) {
-			set_transient( 'dcj_fpm_admin_error', 'CSVインポートのプレビュー結果を確認できませんでした。', 30 );
-			set_transient( 'dcj_fpm_subscriber_csv_import_error', 'CSVインポートのプレビュー結果を確認できませんでした。', 30 );
+			set_transient( 'dcj_fpm_admin_error', 'CSVインポートのプレビュー結果を確認できませんでした。もう一度CSVを選択してプレビューしてください。', 30 );
+			set_transient( 'dcj_fpm_subscriber_csv_import_error', 'CSVインポートのプレビュー結果を確認できませんでした。もう一度CSVを選択してプレビューしてください。', 30 );
 			wp_safe_redirect( $redirect_url );
 			exit;
 		}
@@ -2529,8 +2583,8 @@ class DCJ_Free_PDF_Mailer {
 		$transient_key = $this->get_subscriber_csv_import_transient_key( $token );
 		$preview       = get_transient( $transient_key );
 		if ( empty( $preview ) || ! is_array( $preview ) || empty( $preview['candidates'] ) || ! is_array( $preview['candidates'] ) ) {
-			set_transient( 'dcj_fpm_admin_error', 'CSVインポートのプレビュー結果が期限切れ、または登録候補がありません。', 30 );
-			set_transient( 'dcj_fpm_subscriber_csv_import_error', 'CSVインポートのプレビュー結果が期限切れ、または登録候補がありません。', 30 );
+			set_transient( 'dcj_fpm_admin_error', 'CSVインポートのプレビュー結果が期限切れ、または登録できる行がありません。もう一度プレビューしてください。', 30 );
+			set_transient( 'dcj_fpm_subscriber_csv_import_error', 'CSVインポートのプレビュー結果が期限切れ、または登録できる行がありません。もう一度プレビューしてください。', 30 );
 			wp_safe_redirect( $redirect_url );
 			exit;
 		}
@@ -2589,7 +2643,7 @@ class DCJ_Free_PDF_Mailer {
 
 		$error_count = isset( $preview['errors'] ) && is_array( $preview['errors'] ) ? count( $preview['errors'] ) : 0;
 		$message     = sprintf(
-			'CSVインポートを実行しました。登録成功：%1$d件、実行時スキップ：%2$d件、プレビュー時スキップ・エラー：%3$d件。',
+			'CSVインポートが完了しました。登録できた件数：%1$d件、実行時にスキップした件数：%2$d件、プレビュー時のスキップ・エラー件数：%3$d件。',
 			$success,
 			$skipped,
 			$error_count
@@ -2879,6 +2933,7 @@ class DCJ_Free_PDF_Mailer {
 		$subscriber_search        = $subscriber_filters['search'];
 		$subscriber_status_filter = $subscriber_filters['status'];
 		$total_subscriber_count   = count( $subscribers );
+		$missing_lang_count       = $this->count_subscribers_without_lang();
 		$subscribers              = DCJ_FPM_Subscriber_Helper::filter_subscribers( $subscribers, $subscriber_filters );
 
 		$filtered_subscriber_count = count( $subscribers );
@@ -2942,10 +2997,24 @@ class DCJ_Free_PDF_Mailer {
 			'dcj_fpm_export_broadcast_subscribers',
 			'dcj_fpm_export_broadcast_subscribers_nonce'
 		);
+		$csv_template_url          = wp_nonce_url(
+			add_query_arg(
+				array(
+					'page'           => self::PLUGIN_SLUG,
+					'dcj_fpm_action' => 'download_subscriber_csv_template',
+				),
+				admin_url( 'admin.php' )
+			),
+			'dcj_fpm_download_subscriber_csv_template',
+			'dcj_fpm_subscriber_csv_template_nonce'
+		);
 
 		?>
 		<h2><?php echo esc_html( '購読者リスト' ); ?></h2>
 		<p><?php echo esc_html( 'お知らせ受信に同意したメールアドレスを管理します。配信に使う場合は、購読中のメールアドレスだけを対象にしてください。' ); ?></p>
+		<?php if ( $missing_lang_count > 0 ) : ?>
+			<div class="notice notice-warning inline"><p><?php echo esc_html( '言語が未設定の購読者が ' . absint( $missing_lang_count ) . ' 件あります。必要に応じて ja または en を設定してください。' ); ?></p></div>
+		<?php endif; ?>
 		<p>
 			<a class="button" href="<?php echo esc_url( $export_url ); ?>"><?php echo esc_html( '管理・バックアップ用CSV出力' ); ?></a>
 			<a class="button button-secondary" href="<?php echo esc_url( $broadcast_export_url ); ?>"><?php echo esc_html( 'メール配信用CSV出力（全言語）' ); ?></a>
@@ -2996,7 +3065,11 @@ class DCJ_Free_PDF_Mailer {
 			<button type="submit" class="button button-secondary"><?php echo esc_html( '購読者を追加' ); ?></button>
 		</form>
 		<h3 id="dcj-subscriber-csv-import"><?php echo esc_html( '購読者CSVインポート' ); ?></h3>
-		<p><?php echo esc_html( '同意確認済みの購読者メールアドレスをCSVからまとめて登録できます。1行目はヘッダー、必須列は email と lang、任意列は source_note と consent_confirmed です。lang は ja または en が必須です。' ); ?></p>
+		<p><?php echo esc_html( 'CSV形式で、同意確認済みの購読者をまとめて登録できます。文字コードはUTF-8推奨です。emailは必須、langは ja または en、statusは active を推奨します。インポート前に必ずプレビューを確認してください。' ); ?></p>
+		<p><?php echo esc_html( 'はじめてCSVを作成する場合は、下のCSVテンプレートをダウンロードして、形式を確認してから編集してください。' ); ?></p>
+		<p>
+			<a class="button button-secondary" href="<?php echo esc_url( $csv_template_url ); ?>"><?php echo esc_html( 'CSVテンプレートをダウンロード' ); ?></a>
+		</p>
 		<?php
 		$csv_import_success = get_transient( 'dcj_fpm_subscriber_csv_import_success' );
 		$csv_import_error   = get_transient( 'dcj_fpm_subscriber_csv_import_error' );
