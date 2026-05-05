@@ -3,7 +3,7 @@
  * Plugin Name: DCJ Free PDF Mailer
  * Plugin URI: https://dreamcoloringjourney.com/
  * Description: Dream Coloring Journey の無料PDF配布フォーム用プラグインです。ショートコードIDごとに無料PDFメールを送信します。
- * Version: 1.3.2
+ * Version: 1.4.0
  * Author: 名富企画
  * Author URI: https://dreamcoloringjourney.com/
  * License: GPL2
@@ -33,7 +33,7 @@ class DCJ_Free_PDF_Mailer {
 	/**
 	 * プラグイン定数
 	 */
-	const VERSION                = '1.3.2';
+	const VERSION                = '1.4.0';
 	const PLUGIN_SLUG            = 'dcj-free-pdf-mailer';
 	const CSS_PREFIX             = 'dcj-fpm-';
 	const NONCE_ACTION           = 'dcj_free_pdf_submit';
@@ -42,6 +42,7 @@ class DCJ_Free_PDF_Mailer {
 	const OPTION_PDF_ITEMS       = 'dcj_fpm_pdf_items';
 	const OPTION_SUBMISSION_LOGS = 'dcj_fpm_submission_logs';
 	const OPTION_SUBSCRIBERS     = 'dcj_fpm_subscribers';
+	const OPTION_NEWSLETTER_LOGS = 'dcj_fpm_newsletter_logs';
 	const OPTION_MAIL_SETTINGS   = 'dcj_fpm_mail_settings';
 
 	/**
@@ -1603,6 +1604,7 @@ class DCJ_Free_PDF_Mailer {
 
 			<?php $this->render_submission_logs(); ?>
 			<?php $this->render_subscribers(); ?>
+			<?php $this->render_newsletter_broadcast(); ?>
 		</div>
 		<?php
 	}
@@ -1625,6 +1627,10 @@ class DCJ_Free_PDF_Mailer {
 
 		if ( ! empty( $_POST['dcj_fpm_mail_settings_submit'] ) ) {
 			return $this->handle_admin_mail_settings_submit();
+		}
+
+		if ( ! empty( $_POST['dcj_fpm_newsletter_action'] ) ) {
+			return $this->handle_admin_newsletter_broadcast_submit();
 		}
 
 		$deleted = $this->handle_admin_delete_pdf_item();
@@ -2962,6 +2968,427 @@ class DCJ_Free_PDF_Mailer {
 							<td><?php echo esc_html( ! empty( $log['result'] ) ? $log['result'] : '' ); ?></td>
 							<td><?php echo esc_html( ! empty( $log['ip_address'] ) ? $log['ip_address'] : '' ); ?></td>
 							<td><?php echo esc_html( $newsletter_optin_label ); ?></td>
+						</tr>
+					<?php endforeach; ?>
+				</tbody>
+			</table>
+		<?php endif; ?>
+		<?php
+	}
+
+	/**
+	 * メルマガ送信プレビューの一時保存キーを取得します。
+	 *
+	 * @param string $token トークン
+	 * @return string
+	 */
+	private function get_newsletter_preview_transient_key( $token ) {
+
+		$token = preg_replace( '/[^a-zA-Z0-9]/', '', (string) $token );
+
+		return 'dcj_fpm_newsletter_preview_' . get_current_user_id() . '_' . $token;
+	}
+
+	/**
+	 * 現在のメルマガ送信プレビューをクリアします。
+	 */
+	private function clear_current_newsletter_preview() {
+
+		$token = get_transient( 'dcj_fpm_newsletter_preview_token_' . get_current_user_id() );
+		if ( ! empty( $token ) ) {
+			delete_transient( $this->get_newsletter_preview_transient_key( $token ) );
+		}
+
+		delete_transient( 'dcj_fpm_newsletter_preview_token_' . get_current_user_id() );
+	}
+
+	/**
+	 * メルマガ送信対象ラベルを取得します。
+	 *
+	 * @param string $target 送信対象
+	 * @return string
+	 */
+	private function get_newsletter_target_label( $target ) {
+
+		if ( 'ja' === $target ) {
+			return '日本語購読者';
+		}
+
+		if ( 'en' === $target ) {
+			return '英語購読者';
+		}
+
+		return '全員';
+	}
+
+	/**
+	 * メルマガ送信対象として有効な購読者か判定します。
+	 *
+	 * 既存データでは購読中を subscribed として保存しているため、
+	 * v1.4.0の送信対象では active と subscribed を有効扱いにします。
+	 *
+	 * @param array  $subscriber 購読者
+	 * @param string $target 送信対象
+	 * @return bool
+	 */
+	private function is_newsletter_target_subscriber( $subscriber, $target ) {
+
+		if ( ! is_array( $subscriber ) ) {
+			return false;
+		}
+
+		$email = ! empty( $subscriber['email'] ) ? sanitize_email( $subscriber['email'] ) : '';
+		if ( empty( $email ) || ! is_email( $email ) ) {
+			return false;
+		}
+
+		$status = ! empty( $subscriber['status'] ) ? sanitize_key( $subscriber['status'] ) : 'subscribed';
+		if ( ! in_array( $status, array( 'active', 'subscribed' ), true ) ) {
+			return false;
+		}
+
+		if ( in_array( $target, array( 'ja', 'en' ), true ) ) {
+			$lang = ! empty( $subscriber['lang'] ) ? sanitize_key( $subscriber['lang'] ) : '';
+			return $target === $lang;
+		}
+
+		return true;
+	}
+
+	/**
+	 * メルマガ送信対象購読者を取得します。
+	 *
+	 * @param string $target 送信対象
+	 * @return array
+	 */
+	private function get_newsletter_target_subscribers( $target ) {
+
+		$target      = in_array( $target, array( 'all', 'ja', 'en' ), true ) ? $target : 'all';
+		$subscribers = array();
+
+		foreach ( $this->get_subscribers( 0 ) as $subscriber ) {
+			if ( $this->is_newsletter_target_subscriber( $subscriber, $target ) ) {
+				$email = strtolower( sanitize_email( $subscriber['email'] ) );
+				if ( ! empty( $email ) ) {
+					$subscribers[ $email ] = $subscriber;
+				}
+			}
+		}
+
+		return array_values( $subscribers );
+	}
+
+	/**
+	 * メルマガ送信用メールヘッダーを取得します。
+	 *
+	 * @return array
+	 */
+	private function get_newsletter_mail_headers() {
+
+		$mail_settings = $this->get_mail_settings();
+		$headers       = array();
+
+		if ( ! empty( $mail_settings['from_email'] ) && is_email( $mail_settings['from_email'] ) ) {
+			$headers[] = 'From: ' . $mail_settings['from_name'] . ' <' . $mail_settings['from_email'] . '>';
+		}
+
+		return $headers;
+	}
+
+	/**
+	 * メルマガ送信ログを保存します。
+	 *
+	 * @param array $log ログ
+	 */
+	private function save_newsletter_log( $log ) {
+
+		$logs = get_option( self::OPTION_NEWSLETTER_LOGS, array() );
+		$logs = is_array( $logs ) ? $logs : array();
+
+		array_unshift(
+			$logs,
+			array(
+				'datetime'      => ! empty( $log['datetime'] ) ? sanitize_text_field( $log['datetime'] ) : current_time( 'mysql' ),
+				'subject'       => ! empty( $log['subject'] ) ? sanitize_text_field( $log['subject'] ) : '',
+				'target'        => ! empty( $log['target'] ) ? sanitize_key( $log['target'] ) : 'all',
+				'target_count'  => isset( $log['target_count'] ) ? absint( $log['target_count'] ) : 0,
+				'success_count' => isset( $log['success_count'] ) ? absint( $log['success_count'] ) : 0,
+				'failed_count'  => isset( $log['failed_count'] ) ? absint( $log['failed_count'] ) : 0,
+			)
+		);
+
+		update_option( self::OPTION_NEWSLETTER_LOGS, array_slice( $logs, 0, 50 ) );
+	}
+
+	/**
+	 * メルマガ送信フォームの送信を処理します。
+	 *
+	 * @return bool
+	 */
+	private function handle_admin_newsletter_broadcast_submit() {
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			return false;
+		}
+
+		if ( empty( $_POST['dcj_fpm_newsletter_nonce'] ) ) {
+			set_transient( 'dcj_fpm_admin_error', 'メルマガ送信の確認に失敗しました。管理画面からもう一度お試しください。', 30 );
+			return false;
+		}
+
+		$nonce = sanitize_text_field( wp_unslash( $_POST['dcj_fpm_newsletter_nonce'] ) );
+		if ( ! wp_verify_nonce( $nonce, 'dcj_fpm_newsletter_broadcast' ) ) {
+			set_transient( 'dcj_fpm_admin_error', 'メルマガ送信の確認に失敗しました。管理画面からもう一度お試しください。', 30 );
+			return false;
+		}
+
+		$action = sanitize_key( wp_unslash( $_POST['dcj_fpm_newsletter_action'] ) );
+		$target = ! empty( $_POST['dcj_fpm_newsletter_target'] ) ? sanitize_key( wp_unslash( $_POST['dcj_fpm_newsletter_target'] ) ) : 'all';
+		$target = in_array( $target, array( 'all', 'ja', 'en' ), true ) ? $target : 'all';
+
+		$subject = ! empty( $_POST['dcj_fpm_newsletter_subject'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_fpm_newsletter_subject'] ) ) : '';
+		$body    = ! empty( $_POST['dcj_fpm_newsletter_body'] ) ? sanitize_textarea_field( wp_unslash( $_POST['dcj_fpm_newsletter_body'] ) ) : '';
+		$test_to = ! empty( $_POST['dcj_fpm_newsletter_test_to'] ) ? sanitize_email( wp_unslash( $_POST['dcj_fpm_newsletter_test_to'] ) ) : '';
+
+		if ( 'send' === $action ) {
+			return $this->handle_admin_newsletter_broadcast_send();
+		}
+
+		if ( empty( $subject ) || empty( $body ) ) {
+			set_transient( 'dcj_fpm_admin_error', 'メルマガの件名と本文を入力してください。', 30 );
+			return false;
+		}
+
+		if ( 'test' === $action ) {
+			$this->clear_current_newsletter_preview();
+
+			if ( empty( $test_to ) || ! is_email( $test_to ) ) {
+				set_transient( 'dcj_fpm_admin_error', 'テスト送信先メールアドレスを正しく入力してください。', 30 );
+				return false;
+			}
+
+			$sent = wp_mail( $test_to, $subject, $body, $this->get_newsletter_mail_headers() );
+			if ( $sent ) {
+				set_transient( 'dcj_fpm_admin_success', 'メルマガのテスト送信を行いました。受信箱や迷惑メールフォルダを確認してください。', 30 );
+				return true;
+			}
+
+			set_transient( 'dcj_fpm_admin_error', 'メルマガのテスト送信に失敗しました。SMTP設定や送信先メールアドレスを確認してください。', 30 );
+			return false;
+		}
+
+		if ( 'preview' === $action ) {
+			$this->clear_current_newsletter_preview();
+
+			$target_subscribers = $this->get_newsletter_target_subscribers( $target );
+			$token              = wp_generate_password( 20, false, false );
+			$preview            = array(
+				'token'        => $token,
+				'target'       => $target,
+				'subject'      => $subject,
+				'body'         => $body,
+				'target_count' => count( $target_subscribers ),
+			);
+
+			set_transient( $this->get_newsletter_preview_transient_key( $token ), $preview, 30 * MINUTE_IN_SECONDS );
+			set_transient( 'dcj_fpm_newsletter_preview_token_' . get_current_user_id(), $token, 30 * MINUTE_IN_SECONDS );
+			set_transient( 'dcj_fpm_admin_success', 'メルマガのプレビューを作成しました。内容と対象件数を確認してから送信してください。', 30 );
+			return true;
+		}
+
+		set_transient( 'dcj_fpm_admin_error', 'メルマガ送信の操作を確認できませんでした。', 30 );
+		return false;
+	}
+
+	/**
+	 * メルマガ本送信を実行します。
+	 *
+	 * @return bool
+	 */
+	private function handle_admin_newsletter_broadcast_send() {
+
+		if ( empty( $_POST['dcj_fpm_newsletter_preview_token'] ) ) {
+			set_transient( 'dcj_fpm_admin_error', 'メルマガのプレビュー結果を確認できませんでした。送信前にもう一度プレビューしてください。', 30 );
+			return false;
+		}
+
+		$token   = sanitize_text_field( wp_unslash( $_POST['dcj_fpm_newsletter_preview_token'] ) );
+		$preview = get_transient( $this->get_newsletter_preview_transient_key( $token ) );
+
+		if ( empty( $preview ) || ! is_array( $preview ) ) {
+			set_transient( 'dcj_fpm_admin_error', 'メルマガのプレビュー結果が期限切れです。送信前にもう一度プレビューしてください。', 30 );
+			return false;
+		}
+
+		$target  = ! empty( $preview['target'] ) ? sanitize_key( $preview['target'] ) : 'all';
+		$subject = ! empty( $preview['subject'] ) ? sanitize_text_field( $preview['subject'] ) : '';
+		$body    = ! empty( $preview['body'] ) ? sanitize_textarea_field( $preview['body'] ) : '';
+
+		if ( empty( $subject ) || empty( $body ) ) {
+			set_transient( 'dcj_fpm_admin_error', 'メルマガの件名または本文を確認できませんでした。もう一度プレビューしてください。', 30 );
+			return false;
+		}
+
+		$target_subscribers = $this->get_newsletter_target_subscribers( $target );
+		$headers            = $this->get_newsletter_mail_headers();
+		$success            = 0;
+		$failed             = 0;
+
+		foreach ( $target_subscribers as $subscriber ) {
+			$email = ! empty( $subscriber['email'] ) ? sanitize_email( $subscriber['email'] ) : '';
+			if ( empty( $email ) || ! is_email( $email ) ) {
+				$failed++;
+				continue;
+			}
+
+			if ( wp_mail( $email, $subject, $body, $headers ) ) {
+				$success++;
+			} else {
+				$failed++;
+			}
+		}
+
+		$this->save_newsletter_log(
+			array(
+				'datetime'      => current_time( 'mysql' ),
+				'subject'       => $subject,
+				'target'        => $target,
+				'target_count'  => count( $target_subscribers ),
+				'success_count' => $success,
+				'failed_count'  => $failed,
+			)
+		);
+
+		$this->clear_current_newsletter_preview();
+
+		set_transient(
+			'dcj_fpm_admin_success',
+			sprintf(
+				'メルマガ送信が完了しました。対象：%1$d件、成功：%2$d件、失敗：%3$d件。',
+				count( $target_subscribers ),
+				$success,
+				$failed
+			),
+			30
+		);
+
+		return true;
+	}
+
+	/**
+	 * 管理画面にメルマガ送信フォームを表示します。
+	 */
+	private function render_newsletter_broadcast() {
+
+		$posted_action = ! empty( $_POST['dcj_fpm_newsletter_action'] ) ? sanitize_key( wp_unslash( $_POST['dcj_fpm_newsletter_action'] ) ) : '';
+		$posted_target = ! empty( $_POST['dcj_fpm_newsletter_target'] ) ? sanitize_key( wp_unslash( $_POST['dcj_fpm_newsletter_target'] ) ) : 'all';
+		$posted_target = in_array( $posted_target, array( 'all', 'ja', 'en' ), true ) ? $posted_target : 'all';
+		$posted_subject = ! empty( $_POST['dcj_fpm_newsletter_subject'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_fpm_newsletter_subject'] ) ) : '';
+		$posted_body    = ! empty( $_POST['dcj_fpm_newsletter_body'] ) ? sanitize_textarea_field( wp_unslash( $_POST['dcj_fpm_newsletter_body'] ) ) : '';
+		$posted_test_to = ! empty( $_POST['dcj_fpm_newsletter_test_to'] ) ? sanitize_email( wp_unslash( $_POST['dcj_fpm_newsletter_test_to'] ) ) : '';
+
+		$preview_token = get_transient( 'dcj_fpm_newsletter_preview_token_' . get_current_user_id() );
+		$preview       = ! empty( $preview_token ) ? get_transient( $this->get_newsletter_preview_transient_key( $preview_token ) ) : false;
+
+		if ( is_array( $preview ) ) {
+			$posted_target  = ! empty( $preview['target'] ) ? sanitize_key( $preview['target'] ) : $posted_target;
+			$posted_subject = ! empty( $preview['subject'] ) ? sanitize_text_field( $preview['subject'] ) : $posted_subject;
+			$posted_body    = ! empty( $preview['body'] ) ? sanitize_textarea_field( $preview['body'] ) : $posted_body;
+		}
+
+		$newsletter_logs = get_option( self::OPTION_NEWSLETTER_LOGS, array() );
+		$newsletter_logs = is_array( $newsletter_logs ) ? array_slice( $newsletter_logs, 0, 10 ) : array();
+
+		?>
+		<h2 id="dcj-newsletter-broadcast"><?php echo esc_html( 'メルマガ送信' ); ?></h2>
+		<p><?php echo esc_html( '購読中のメールアドレスに、手動でメルマガを送信できます。まずテスト送信またはプレビューで内容を確認してから送信してください。' ); ?></p>
+		<form method="post" action="#dcj-newsletter-broadcast" style="margin: 1em 0;">
+			<?php wp_nonce_field( 'dcj_fpm_newsletter_broadcast', 'dcj_fpm_newsletter_nonce' ); ?>
+			<table class="form-table">
+				<tr>
+					<th scope="row"><label for="dcj-fpm-newsletter-target"><?php echo esc_html( '送信対象' ); ?></label></th>
+					<td>
+						<select id="dcj-fpm-newsletter-target" name="dcj_fpm_newsletter_target">
+							<option value="all" <?php selected( $posted_target, 'all' ); ?>><?php echo esc_html( '全員' ); ?></option>
+							<option value="ja" <?php selected( $posted_target, 'ja' ); ?>><?php echo esc_html( '日本語購読者' ); ?></option>
+							<option value="en" <?php selected( $posted_target, 'en' ); ?>><?php echo esc_html( '英語購読者' ); ?></option>
+						</select>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj-fpm-newsletter-subject"><?php echo esc_html( '件名' ); ?></label></th>
+					<td><input type="text" id="dcj-fpm-newsletter-subject" name="dcj_fpm_newsletter_subject" value="<?php echo esc_attr( $posted_subject ); ?>" class="large-text" required></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj-fpm-newsletter-body"><?php echo esc_html( '本文' ); ?></label></th>
+					<td><textarea id="dcj-fpm-newsletter-body" name="dcj_fpm_newsletter_body" class="large-text" rows="8" required><?php echo esc_textarea( $posted_body ); ?></textarea></td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj-fpm-newsletter-test-to"><?php echo esc_html( 'テスト送信先メールアドレス' ); ?></label></th>
+					<td><input type="email" id="dcj-fpm-newsletter-test-to" name="dcj_fpm_newsletter_test_to" value="<?php echo esc_attr( $posted_test_to ); ?>" class="regular-text"></td>
+				</tr>
+			</table>
+			<p>
+				<button type="submit" class="button button-secondary" name="dcj_fpm_newsletter_action" value="test"><?php echo esc_html( 'テスト送信' ); ?></button>
+				<button type="submit" class="button button-primary" name="dcj_fpm_newsletter_action" value="preview"><?php echo esc_html( 'プレビュー' ); ?></button>
+			</p>
+		</form>
+		<?php if ( is_array( $preview ) ) : ?>
+			<h3><?php echo esc_html( 'メルマガ送信プレビュー' ); ?></h3>
+			<table class="widefat striped" style="max-width: 760px;">
+				<tbody>
+					<tr>
+						<th><?php echo esc_html( '送信対象' ); ?></th>
+						<td><?php echo esc_html( $this->get_newsletter_target_label( $posted_target ) ); ?></td>
+					</tr>
+					<tr>
+						<th><?php echo esc_html( '対象購読者数' ); ?></th>
+						<td><?php echo esc_html( absint( $preview['target_count'] ) . '件' ); ?></td>
+					</tr>
+					<tr>
+						<th><?php echo esc_html( '件名' ); ?></th>
+						<td><?php echo esc_html( $posted_subject ); ?></td>
+					</tr>
+					<tr>
+						<th><?php echo esc_html( '本文' ); ?></th>
+						<td><pre style="white-space: pre-wrap; margin: 0;"><?php echo esc_html( $posted_body ); ?></pre></td>
+					</tr>
+				</tbody>
+			</table>
+			<?php if ( ! empty( $preview['target_count'] ) ) : ?>
+				<form method="post" action="#dcj-newsletter-broadcast" style="margin: 1em 0;">
+					<?php wp_nonce_field( 'dcj_fpm_newsletter_broadcast', 'dcj_fpm_newsletter_nonce' ); ?>
+					<input type="hidden" name="dcj_fpm_newsletter_preview_token" value="<?php echo esc_attr( $preview_token ); ?>">
+					<button type="submit" class="button button-primary" name="dcj_fpm_newsletter_action" value="send" onclick="return confirm('<?php echo esc_attr( 'プレビュー内容でメルマガを送信します。よろしいですか？' ); ?>');"><?php echo esc_html( '送信実行' ); ?></button>
+				</form>
+			<?php else : ?>
+				<p><?php echo esc_html( '対象購読者が0件のため、送信実行はできません。' ); ?></p>
+			<?php endif; ?>
+		<?php endif; ?>
+		<h3><?php echo esc_html( 'メルマガ送信ログ' ); ?></h3>
+		<?php if ( empty( $newsletter_logs ) ) : ?>
+			<p><?php echo esc_html( 'まだメルマガ送信ログはありません。' ); ?></p>
+		<?php else : ?>
+			<table class="widefat striped">
+				<thead>
+					<tr>
+						<th><?php echo esc_html( '送信日時' ); ?></th>
+						<th><?php echo esc_html( '件名' ); ?></th>
+						<th><?php echo esc_html( '送信対象' ); ?></th>
+						<th><?php echo esc_html( '対象件数' ); ?></th>
+						<th><?php echo esc_html( '成功件数' ); ?></th>
+						<th><?php echo esc_html( '失敗件数' ); ?></th>
+					</tr>
+				</thead>
+				<tbody>
+					<?php foreach ( $newsletter_logs as $log ) : ?>
+						<tr>
+							<td><?php echo esc_html( ! empty( $log['datetime'] ) ? $log['datetime'] : '' ); ?></td>
+							<td><?php echo esc_html( ! empty( $log['subject'] ) ? $log['subject'] : '' ); ?></td>
+							<td><?php echo esc_html( $this->get_newsletter_target_label( ! empty( $log['target'] ) ? $log['target'] : 'all' ) ); ?></td>
+							<td><?php echo esc_html( isset( $log['target_count'] ) ? absint( $log['target_count'] ) . '件' : '0件' ); ?></td>
+							<td><?php echo esc_html( isset( $log['success_count'] ) ? absint( $log['success_count'] ) . '件' : '0件' ); ?></td>
+							<td><?php echo esc_html( isset( $log['failed_count'] ) ? absint( $log['failed_count'] ) . '件' : '0件' ); ?></td>
 						</tr>
 					<?php endforeach; ?>
 				</tbody>
