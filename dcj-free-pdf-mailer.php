@@ -3,7 +3,7 @@
  * Plugin Name: DCJ Free PDF Mailer
  * Plugin URI: https://dreamcoloringjourney.com/
  * Description: Dream Coloring Journey の無料PDF配布フォーム用プラグインです。ショートコードIDごとに無料PDFメールを送信します。
- * Version: 1.6.0
+ * Version: 1.6.1
  * Author: 名富企画
  * Author URI: https://dreamcoloringjourney.com/
  * License: GPL2
@@ -33,7 +33,7 @@ class DCJ_Free_PDF_Mailer {
 	/**
 	 * プラグイン定数
 	 */
-	const VERSION                     = '1.6.0';
+	const VERSION                     = '1.6.1';
 	const PLUGIN_SLUG                 = 'dcj-free-pdf-mailer';
 	const CSS_PREFIX                  = 'dcj-fpm-';
 	const NONCE_ACTION                = 'dcj_free_pdf_submit';
@@ -82,6 +82,7 @@ class DCJ_Free_PDF_Mailer {
 		add_action( 'admin_init', array( $this, 'handle_admin_update_subscriber_status' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_delete_subscriber' ) );
 		add_action( 'admin_init', array( $this, 'handle_admin_clear_logs' ) );
+		add_action( 'admin_init', array( $this, 'handle_admin_clear_newsletter_logs' ) );
 
 		// 管理画面のメディアライブラリ選択
 		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_media' ) );
@@ -92,21 +93,19 @@ class DCJ_Free_PDF_Mailer {
 	 * 無料PDFコンテンツ設定を取得します。
 	 *
 	 * WordPress option から保存されたPDF設定を取得します。
-	 * option が未設定または無効な場合は、デフォルト設定を返します。
+	 * option が未設定または無効な場合は、空配列を返します。
 	 *
 	 * @return array
 	 */
 	private function get_pdf_items() {
 
-		$items = get_option( self::OPTION_PDF_ITEMS );
+		$items = get_option( self::OPTION_PDF_ITEMS, array() );
 
-		// option が存在し、配列であることを確認
-		if ( is_array( $items ) && ! empty( $items ) ) {
+		if ( is_array( $items ) ) {
 			return $items;
 		}
 
-		// option が未設定または無効な場合、デフォルト設定を返す
-		return self::get_default_pdf_items();
+		return array();
 	}
 
 	/**
@@ -1752,52 +1751,57 @@ class DCJ_Free_PDF_Mailer {
 					</tr>
 				</thead>
 				<tbody>
-					<?php
-					foreach ( $pdf_items as $pdf_id => $pdf_item ) {
-						$shortcode      = '[dcj_free_pdf id="' . $pdf_id . '"]';
-						$enabled        = ! empty( $pdf_item['enabled'] ) ? '有効' : '無効';
-						$lang           = ! empty( $pdf_item['lang'] ) ? $pdf_item['lang'] : '-';
-						$category       = ! empty( $pdf_item['category'] ) ? $pdf_item['category'] : '-';
-						$category       = isset( $category_options[ $category ] ) ? $category_options[ $category ] : $category;
-						$title          = ! empty( $pdf_item['title'] ) ? $pdf_item['title'] : '-';
-						$admin_note     = ! empty( $pdf_item['admin_note'] ) ? $pdf_item['admin_note'] : '-';
-						$edit_url       = wp_nonce_url(
-							add_query_arg(
-								array(
-									'page'           => self::PLUGIN_SLUG,
-									'dcj_fpm_action' => 'edit',
-									'dcj_pdf_id'     => rawurlencode( $pdf_id ),
+					<?php if ( empty( $pdf_items ) ) : ?>
+						<tr>
+							<td colspan="7"><?php echo esc_html( 'PDF設定はまだありません。新規追加してください。' ); ?></td>
+						</tr>
+					<?php else : ?>
+						<?php
+						foreach ( $pdf_items as $pdf_id => $pdf_item ) {
+							$shortcode      = '[dcj_free_pdf id="' . $pdf_id . '"]';
+							$enabled        = ! empty( $pdf_item['enabled'] ) ? '有効' : '無効';
+							$lang           = ! empty( $pdf_item['lang'] ) ? $pdf_item['lang'] : '-';
+							$category       = ! empty( $pdf_item['category'] ) ? $pdf_item['category'] : '-';
+							$category       = isset( $category_options[ $category ] ) ? $category_options[ $category ] : $category;
+							$title          = ! empty( $pdf_item['title'] ) ? $pdf_item['title'] : '-';
+							$admin_note     = ! empty( $pdf_item['admin_note'] ) ? $pdf_item['admin_note'] : '-';
+							$edit_url       = wp_nonce_url(
+								add_query_arg(
+									array(
+										'page'           => self::PLUGIN_SLUG,
+										'dcj_fpm_action' => 'edit',
+										'dcj_pdf_id'     => rawurlencode( $pdf_id ),
+									),
+									admin_url( 'admin.php' )
 								),
-								admin_url( 'admin.php' )
-							),
-							'dcj_fpm_edit_pdf_item_' . $pdf_id,
-							'dcj_fpm_edit_pdf_item_nonce'
-						);
-						$duplicate_url  = wp_nonce_url(
-							add_query_arg(
-								array(
-									'page'           => self::PLUGIN_SLUG,
-									'dcj_fpm_action' => 'duplicate',
-									'dcj_pdf_id'     => rawurlencode( $pdf_id ),
+								'dcj_fpm_edit_pdf_item_' . $pdf_id,
+								'dcj_fpm_edit_pdf_item_nonce'
+							);
+							$duplicate_url  = wp_nonce_url(
+								add_query_arg(
+									array(
+										'page'           => self::PLUGIN_SLUG,
+										'dcj_fpm_action' => 'duplicate',
+										'dcj_pdf_id'     => rawurlencode( $pdf_id ),
+									),
+									admin_url( 'admin.php' )
 								),
-								admin_url( 'admin.php' )
-							),
-							'dcj_fpm_duplicate_pdf_item_' . $pdf_id,
-							'dcj_fpm_duplicate_pdf_item_nonce'
-						);
-						$delete_url     = wp_nonce_url(
-							add_query_arg(
-								array(
-									'page'           => self::PLUGIN_SLUG,
-									'dcj_fpm_action' => 'delete',
-									'dcj_pdf_id'     => rawurlencode( $pdf_id ),
+								'dcj_fpm_duplicate_pdf_item_' . $pdf_id,
+								'dcj_fpm_duplicate_pdf_item_nonce'
+							);
+							$delete_url     = wp_nonce_url(
+								add_query_arg(
+									array(
+										'page'           => self::PLUGIN_SLUG,
+										'dcj_fpm_action' => 'delete',
+										'dcj_pdf_id'     => rawurlencode( $pdf_id ),
+									),
+									admin_url( 'admin.php' )
 								),
-								admin_url( 'admin.php' )
-							),
-							'dcj_fpm_delete_pdf_item_' . $pdf_id,
-							'dcj_fpm_delete_pdf_item_nonce'
-						);
-						?>
+								'dcj_fpm_delete_pdf_item_' . $pdf_id,
+								'dcj_fpm_delete_pdf_item_nonce'
+							);
+							?>
 						<tr>
 							<td><code><?php echo esc_html( $shortcode ); ?></code></td>
 							<td><?php echo esc_html( $lang ); ?></td>
@@ -1813,9 +1817,10 @@ class DCJ_Free_PDF_Mailer {
 								<a href="<?php echo esc_url( $delete_url ); ?>" onclick="return confirm('<?php echo esc_attr( 'このPDF設定を削除します。よろしいですか？' ); ?>');"><?php echo esc_html( '削除' ); ?></a>
 							</td>
 						</tr>
-						<?php
-					}
-					?>
+							<?php
+						}
+						?>
+					<?php endif; ?>
 				</tbody>
 			</table>
 
@@ -3112,6 +3117,50 @@ class DCJ_Free_PDF_Mailer {
 	}
 
 	/**
+	 * メルマガ送信ログを全削除します。
+	 */
+	public function handle_admin_clear_newsletter_logs() {
+
+		if ( empty( $_GET['page'] ) || self::PLUGIN_SLUG !== sanitize_key( wp_unslash( $_GET['page'] ) ) ) {
+			return;
+		}
+
+		if ( empty( $_GET['dcj_fpm_action'] ) || 'clear_newsletter_logs' !== sanitize_key( wp_unslash( $_GET['dcj_fpm_action'] ) ) ) {
+			return;
+		}
+
+		$redirect_url = add_query_arg(
+			array(
+				'page' => self::PLUGIN_SLUG,
+			),
+			admin_url( 'admin.php' )
+		) . '#dcj-newsletter-broadcast';
+
+		if ( ! current_user_can( 'manage_options' ) ) {
+			wp_die( esc_html__( 'You do not have sufficient permissions to access this page.', 'dcj-free-pdf-mailer' ) );
+		}
+
+		if ( empty( $_GET['dcj_fpm_clear_newsletter_logs_nonce'] ) ) {
+			set_transient( 'dcj_fpm_admin_error', 'メルマガ送信ログクリアの確認に失敗しました。', 30 );
+			wp_safe_redirect( $redirect_url );
+			exit;
+		}
+
+		$nonce = sanitize_text_field( wp_unslash( $_GET['dcj_fpm_clear_newsletter_logs_nonce'] ) );
+		if ( ! wp_verify_nonce( $nonce, 'dcj_fpm_clear_newsletter_logs' ) ) {
+			set_transient( 'dcj_fpm_admin_error', 'メルマガ送信ログクリアの確認に失敗しました。', 30 );
+			wp_safe_redirect( $redirect_url );
+			exit;
+		}
+
+		update_option( self::OPTION_NEWSLETTER_LOGS, array() );
+		set_transient( 'dcj_fpm_admin_success', 'メルマガ送信ログをクリアしました。', 30 );
+
+		wp_safe_redirect( $redirect_url );
+		exit;
+	}
+
+	/**
 	 * 管理画面に送信ログ一覧を表示します。
 	 */
 	private function render_submission_logs() {
@@ -3777,6 +3826,17 @@ class DCJ_Free_PDF_Mailer {
 		$newsletter_logs = get_option( self::OPTION_NEWSLETTER_LOGS, array() );
 		$newsletter_logs = is_array( $newsletter_logs ) ? array_slice( $newsletter_logs, 0, 10 ) : array();
 		$newsletter_templates = $this->get_newsletter_templates();
+		$newsletter_log_clear_url = wp_nonce_url(
+			add_query_arg(
+				array(
+					'page'           => self::PLUGIN_SLUG,
+					'dcj_fpm_action' => 'clear_newsletter_logs',
+				),
+				admin_url( 'admin.php' )
+			),
+			'dcj_fpm_clear_newsletter_logs',
+			'dcj_fpm_clear_newsletter_logs_nonce'
+		);
 
 		?>
 		<h2 id="dcj-newsletter-broadcast"><?php echo esc_html( 'メルマガ送信' ); ?></h2>
@@ -3946,6 +4006,9 @@ class DCJ_Free_PDF_Mailer {
 		<?php if ( empty( $newsletter_logs ) ) : ?>
 			<p><?php echo esc_html( 'まだメルマガ送信ログはありません。' ); ?></p>
 		<?php else : ?>
+			<p>
+				<a href="<?php echo esc_url( $newsletter_log_clear_url ); ?>" class="button button-secondary" onclick="return confirm('<?php echo esc_attr( 'メルマガ送信ログをクリアします。購読者、PDF設定、テンプレート、配信カテゴリには影響しません。よろしいですか？' ); ?>');"><?php echo esc_html( '送信ログをクリア' ); ?></a>
+			</p>
 			<table class="widefat striped">
 				<thead>
 					<tr>
@@ -5177,11 +5240,15 @@ class DCJ_Free_PDF_Mailer {
 	 */
 	public static function activate() {
 
-		$items = get_option( self::OPTION_PDF_ITEMS, array() );
+		$items = get_option( self::OPTION_PDF_ITEMS, false );
 
-		// option が未設定または無効な場合のみデフォルト設定を保存
-		if ( empty( $items ) || ! is_array( $items ) ) {
-			add_option( self::OPTION_PDF_ITEMS, self::get_default_pdf_items() );
+		if ( false === $items ) {
+			add_option( self::OPTION_PDF_ITEMS, array() );
+			return;
+		}
+
+		if ( ! is_array( $items ) ) {
+			update_option( self::OPTION_PDF_ITEMS, array() );
 		}
 	}
 }
