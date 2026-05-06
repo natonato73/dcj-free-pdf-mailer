@@ -3,7 +3,7 @@
  * Plugin Name: DCJ Free PDF Mailer
  * Plugin URI: https://dreamcoloringjourney.com/
  * Description: Dream Coloring Journey の無料PDF配布フォーム用プラグインです。ショートコードIDごとに無料PDFメールを送信します。
- * Version: 1.5.2
+ * Version: 1.6.0
  * Author: 名富企画
  * Author URI: https://dreamcoloringjourney.com/
  * License: GPL2
@@ -33,7 +33,7 @@ class DCJ_Free_PDF_Mailer {
 	/**
 	 * プラグイン定数
 	 */
-	const VERSION                     = '1.5.2';
+	const VERSION                     = '1.6.0';
 	const PLUGIN_SLUG                 = 'dcj-free-pdf-mailer';
 	const CSS_PREFIX                  = 'dcj-fpm-';
 	const NONCE_ACTION                = 'dcj_free_pdf_submit';
@@ -277,6 +277,216 @@ class DCJ_Free_PDF_Mailer {
 			'practice_material' => '練習教材',
 			'other'             => 'その他',
 		);
+	}
+
+	/**
+	 * メルマガ配信カテゴリタグ一覧を取得します。
+	 *
+	 * @return array
+	 */
+	private function get_newsletter_tag_options() {
+		return array(
+			'new_pdf'       => '新作塗り絵PDF案内',
+			'seasonal'      => '季節の塗り絵紹介',
+			'amazon_books'  => 'Amazon書籍紹介',
+			'gumroad_books' => 'Gumroad書籍紹介',
+			'kids'          => '子ども向け塗り絵案内',
+			'adult'         => '大人の塗り絵案内',
+			'blog'          => 'ブログ記事紹介',
+		);
+	}
+
+	/**
+	 * CSV入力で許可する日本語タグ名の表記ゆれを取得します。
+	 *
+	 * @return array
+	 */
+	private function get_newsletter_tag_alias_options() {
+		return array(
+			'new_pdf'       => array(
+				'新作塗り絵PDF案内',
+				'新作塗り絵案内',
+				'新作PDF案内',
+			),
+			'seasonal'      => array(
+				'季節の塗り絵紹介',
+				'季節塗り絵紹介',
+				'季節の塗り絵案内',
+			),
+			'amazon_books'  => array(
+				'Amazon書籍紹介',
+				'Amazon本紹介',
+				'Amazon塗り絵紹介',
+			),
+			'gumroad_books' => array(
+				'Gumroad書籍紹介',
+				'Gumroad本紹介',
+				'Gumroad塗り絵紹介',
+			),
+			'kids'          => array(
+				'子ども向け塗り絵案内',
+				'子供向け塗り絵案内',
+				'子ども向け 塗り絵案内',
+				'子供向け 塗り絵案内',
+			),
+			'adult'         => array(
+				'大人の塗り絵案内',
+				'大人向け塗り絵案内',
+				'大人向け 塗り絵案内',
+			),
+			'blog'          => array(
+				'ブログ記事紹介',
+				'ブログ紹介',
+				'記事紹介',
+			),
+		);
+	}
+
+	/**
+	 * メルマガ配信カテゴリタグ入力の比較用文字列を作ります。
+	 *
+	 * @param string $tag タグ入力値
+	 * @return string
+	 */
+	private function normalize_newsletter_tag_text( $tag ) {
+		if ( is_string( $tag ) ) {
+			$tag = wp_unslash( $tag );
+		}
+
+		$tag = sanitize_text_field( (string) $tag );
+		$tag = preg_replace( '/^\xEF\xBB\xBF/', '', $tag );
+		$tag = html_entity_decode( $tag, ENT_QUOTES, get_bloginfo( 'charset' ) );
+		$tag = str_replace( array( "\xC2\xA0", '　', "\t", "\r", "\n" ), ' ', $tag );
+		$tag = trim( $tag );
+		$tag = preg_replace( '/^[\s　"\'“”‘’「」『』（）()\[\]【】]+|[\s　"\'“”‘’「」『』（）()\[\]【】]+$/u', '', $tag );
+		$tag = preg_replace( '/\s+/u', '', $tag );
+
+		return trim( (string) $tag );
+	}
+
+	/**
+	 * メルマガ配信カテゴリタグ入力をタグIDへ変換します。
+	 *
+	 * @param string $tag タグIDまたは日本語タグ名
+	 * @return string
+	 */
+	private function normalize_newsletter_tag_id( $tag ) {
+		$tag_text = $this->normalize_newsletter_tag_text( $tag );
+		$options  = $this->get_newsletter_tag_options();
+
+		if ( '' === $tag_text ) {
+			return '';
+		}
+
+		$tag_key = sanitize_key( strtolower( $tag_text ) );
+		if ( isset( $options[ $tag_key ] ) ) {
+			return $tag_key;
+		}
+
+		foreach ( $this->get_newsletter_tag_alias_options() as $tag_id => $tag_aliases ) {
+			foreach ( $tag_aliases as $tag_alias ) {
+				if ( $tag_text === $this->normalize_newsletter_tag_text( $tag_alias ) ) {
+					return $tag_id;
+				}
+			}
+		}
+
+		return '';
+	}
+
+	/**
+	 * メルマガ配信カテゴリタグ入力を分割します。
+	 *
+	 * @param array|string $tags タグ配列または区切り文字列
+	 * @return array
+	 */
+	private function split_newsletter_tag_input( $tags ) {
+		if ( is_string( $tags ) ) {
+			$tags = explode( '|', $tags );
+		}
+
+		if ( ! is_array( $tags ) ) {
+			return array();
+		}
+
+		$split_tags = array();
+
+		foreach ( $tags as $tag ) {
+			if ( is_string( $tag ) && false !== strpos( $tag, '|' ) ) {
+				foreach ( explode( '|', $tag ) as $split_tag ) {
+					$split_tags[] = $split_tag;
+				}
+				continue;
+			}
+
+			$split_tags[] = $tag;
+		}
+
+		return $split_tags;
+	}
+
+	/**
+	 * メルマガ配信カテゴリタグをサニタイズします。
+	 *
+	 * @param array|string $tags タグ配列または区切り文字列
+	 * @return array
+	 */
+	private function sanitize_newsletter_tags( $tags ) {
+		$valid_tags     = array_keys( $this->get_newsletter_tag_options() );
+		$sanitized_tags = array();
+
+		foreach ( $this->split_newsletter_tag_input( $tags ) as $tag ) {
+			$tag = $this->normalize_newsletter_tag_id( $tag );
+			if ( '' !== $tag && in_array( $tag, $valid_tags, true ) ) {
+				$sanitized_tags[ $tag ] = true;
+			}
+		}
+
+		return array_keys( $sanitized_tags );
+	}
+
+	/**
+	 * 未対応のメルマガ配信カテゴリタグ入力を取得します。
+	 *
+	 * @param array|string $tags タグ配列または区切り文字列
+	 * @return array
+	 */
+	private function get_unsupported_newsletter_tags( $tags ) {
+		$unsupported_tags = array();
+
+		foreach ( $this->split_newsletter_tag_input( $tags ) as $tag ) {
+			$tag_label = trim( sanitize_text_field( (string) $tag ) );
+			$tag_label = trim( str_replace( array( "\xC2\xA0", '　' ), ' ', $tag_label ) );
+
+			if ( '' === $this->normalize_newsletter_tag_text( $tag_label ) ) {
+				continue;
+			}
+
+			if ( '' === $this->normalize_newsletter_tag_id( $tag_label ) ) {
+				$unsupported_tags[ $tag_label ] = true;
+			}
+		}
+
+		return array_keys( $unsupported_tags );
+	}
+
+	/**
+	 * メルマガ配信カテゴリタグの表示名を取得します。
+	 *
+	 * @param array|string $tags タグ
+	 * @return array
+	 */
+	private function get_newsletter_tag_labels( $tags ) {
+		$options = $this->get_newsletter_tag_options();
+		$labels  = array();
+
+		foreach ( $this->sanitize_newsletter_tags( $tags ) as $tag ) {
+			if ( isset( $options[ $tag ] ) ) {
+				$labels[] = $options[ $tag ];
+			}
+		}
+
+		return $labels;
 	}
 
 	/**
@@ -527,6 +737,12 @@ class DCJ_Free_PDF_Mailer {
 		$subscribers[ $email ]['source_title']       = ! empty( $pdf_item['title'] ) ? sanitize_text_field( $pdf_item['title'] ) : '';
 		$subscribers[ $email ]['last_seen_datetime'] = $now;
 		$subscribers[ $email ]['status']             = 'subscribed';
+		$subscribers[ $email ]['tags']               = $this->sanitize_newsletter_tags(
+			array_merge(
+				! empty( $subscribers[ $email ]['tags'] ) ? (array) $subscribers[ $email ]['tags'] : array(),
+				! empty( $pdf_item['tags'] ) ? (array) $pdf_item['tags'] : array()
+			)
+		);
 
 		update_option( self::OPTION_SUBSCRIBERS, $subscribers );
 	}
@@ -757,6 +973,7 @@ class DCJ_Free_PDF_Mailer {
 		$preview           = $this->get_empty_subscriber_csv_import_preview();
 		$line_number       = 1;
 		$has_consent_field = isset( $header_map['consent_confirmed'] );
+		$has_tags_field    = isset( $header_map['tags'] );
 
 		foreach ( $subscribers as $subscriber_email => $subscriber ) {
 			$normalized_email = strtolower( sanitize_email( $subscriber_email ) );
@@ -853,11 +1070,25 @@ class DCJ_Free_PDF_Mailer {
 			if ( isset( $header_map['source_note'] ) && isset( $row[ $header_map['source_note'] ] ) ) {
 				$source_note = sanitize_text_field( $row[ $header_map['source_note'] ] );
 			}
+			$tags = array();
+			if ( $has_tags_field && isset( $row[ $header_map['tags'] ] ) ) {
+				$tags             = $this->sanitize_newsletter_tags( $row[ $header_map['tags'] ] );
+				$unsupported_tags = $this->get_unsupported_newsletter_tags( $row[ $header_map['tags'] ] );
+
+				if ( ! empty( $unsupported_tags ) ) {
+					$preview['errors'][] = array(
+						'line'   => $line_number,
+						'email'  => $email,
+						'reason' => '未対応の配信カテゴリがあります：' . implode( ' / ', $unsupported_tags ),
+					);
+				}
+			}
 
 			$preview['candidates'][] = array(
 				'email'       => $email,
 				'lang'        => $lang,
 				'source_note' => $source_note,
+				'tags'        => $tags,
 			);
 		}
 
@@ -2173,6 +2404,8 @@ class DCJ_Free_PDF_Mailer {
 		$log_filters = $this->get_submission_log_filters_from_request();
 		$log_filters['newsletter_consent'] = 'all';
 		$logs        = $this->filter_submission_logs( $logs, $log_filters );
+		$current_subscribers = get_option( self::OPTION_SUBSCRIBERS, array() );
+		$current_subscribers = is_array( $current_subscribers ) ? $current_subscribers : array();
 		$seen_emails = array();
 		$subscribers = array();
 
@@ -2192,13 +2425,14 @@ class DCJ_Free_PDF_Mailer {
 				'lang'     => ! empty( $log['lang'] ) ? sanitize_key( $log['lang'] ) : '',
 				'pdf_id'   => ! empty( $log['pdf_id'] ) ? sanitize_key( $log['pdf_id'] ) : '',
 				'datetime' => ! empty( $log['datetime'] ) ? sanitize_text_field( $log['datetime'] ) : '',
+				'tags'     => ! empty( $current_subscribers[ $email ]['tags'] ) ? $this->sanitize_newsletter_tags( $current_subscribers[ $email ]['tags'] ) : array(),
 			);
 		}
 
 		$timestamp = date_i18n( 'Ymd-His', current_time( 'timestamp' ) );
 		$filename  = 'dcj-free-pdf-optin-subscribers-' . $timestamp . '.csv';
 		$rows      = array(
-			array( 'メールアドレス', '言語', '登録元PDF ID', '同意日時', 'お知らせ同意' ),
+			array( 'メールアドレス', '言語', '登録元PDF ID', '同意日時', 'お知らせ同意', 'tags' ),
 		);
 
 		foreach ( $subscribers as $subscriber ) {
@@ -2208,6 +2442,7 @@ class DCJ_Free_PDF_Mailer {
 				$subscriber['pdf_id'],
 				$subscriber['datetime'],
 				'同意あり',
+				implode( '|', $this->sanitize_newsletter_tags( ! empty( $subscriber['tags'] ) ? $subscriber['tags'] : array() ) ),
 			);
 		}
 
@@ -2244,7 +2479,7 @@ class DCJ_Free_PDF_Mailer {
 		$timestamp   = date_i18n( 'Ymd-His', current_time( 'timestamp' ) );
 		$filename    = 'dcj-free-pdf-subscribers-' . $timestamp . '.csv';
 		$rows        = array(
-			array( 'メールアドレス', '言語', '登録元PDF ID', '登録元タイトル', '初回同意日時', '最終同意日時', '状態' ),
+			array( 'メールアドレス', '言語', '登録元PDF ID', '登録元タイトル', '初回同意日時', '最終同意日時', '状態', 'tags' ),
 		);
 
 		foreach ( $subscribers as $subscriber ) {
@@ -2256,6 +2491,7 @@ class DCJ_Free_PDF_Mailer {
 				! empty( $subscriber['optin_datetime'] ) ? $subscriber['optin_datetime'] : '',
 				! empty( $subscriber['last_seen_datetime'] ) ? $subscriber['last_seen_datetime'] : '',
 				DCJ_FPM_Subscriber_Helper::get_status_label( ! empty( $subscriber['status'] ) ? $subscriber['status'] : 'subscribed' ),
+				implode( '|', $this->sanitize_newsletter_tags( ! empty( $subscriber['tags'] ) ? $subscriber['tags'] : array() ) ),
 			);
 		}
 
@@ -2312,7 +2548,7 @@ class DCJ_Free_PDF_Mailer {
 		$language_suffix = '' !== $broadcast_lang ? $broadcast_lang : 'all';
 		$filename        = 'dcj-broadcast-subscribers-' . $language_suffix . '-' . $timestamp . '.csv';
 		$rows                         = array(
-			array( 'メールアドレス', '言語', '登録元PDF ID', '登録元タイトル', '最終同意日時' ),
+			array( 'メールアドレス', '言語', '登録元PDF ID', '登録元タイトル', '最終同意日時', 'tags' ),
 		);
 
 		foreach ( $subscribers as $subscriber ) {
@@ -2322,6 +2558,7 @@ class DCJ_Free_PDF_Mailer {
 				! empty( $subscriber['source_pdf_id'] ) ? $subscriber['source_pdf_id'] : '',
 				! empty( $subscriber['source_title'] ) ? $subscriber['source_title'] : '',
 				! empty( $subscriber['last_seen_datetime'] ) ? $subscriber['last_seen_datetime'] : '',
+				implode( '|', $this->sanitize_newsletter_tags( ! empty( $subscriber['tags'] ) ? $subscriber['tags'] : array() ) ),
 			);
 		}
 
@@ -2355,9 +2592,9 @@ class DCJ_Free_PDF_Mailer {
 		}
 
 		$rows = array(
-			array( 'email', 'name', 'lang', 'status' ),
-			array( 'sample@example.com', '山田太郎', 'ja', 'active' ),
-			array( 'sample-en@example.com', 'John Smith', 'en', 'active' ),
+			array( 'email', 'name', 'lang', 'status', 'tags' ),
+			array( 'sample@example.com', '山田太郎', 'ja', 'active', '新作塗り絵PDF案内|季節の塗り絵紹介|子ども向け塗り絵案内' ),
+			array( 'sample-en@example.com', 'John Smith', 'en', 'active', 'Amazon書籍紹介|大人の塗り絵案内' ),
 		);
 
 		DCJ_FPM_CSV_Exporter::output_csv( 'dcj-free-pdf-subscriber-import-template.csv', $rows );
@@ -2406,6 +2643,7 @@ class DCJ_Free_PDF_Mailer {
 		$email = ! empty( $_POST['dcj_manual_subscriber_email'] ) ? strtolower( sanitize_email( wp_unslash( $_POST['dcj_manual_subscriber_email'] ) ) ) : '';
 		$lang  = ! empty( $_POST['dcj_manual_subscriber_lang'] ) ? sanitize_key( wp_unslash( $_POST['dcj_manual_subscriber_lang'] ) ) : '';
 		$memo  = ! empty( $_POST['dcj_manual_subscriber_source_note'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_manual_subscriber_source_note'] ) ) : '';
+		$tags  = ! empty( $_POST['dcj_manual_subscriber_tags'] ) ? $this->sanitize_newsletter_tags( wp_unslash( $_POST['dcj_manual_subscriber_tags'] ) ) : array();
 
 		if ( empty( $email ) || ! is_email( $email ) ) {
 			set_transient( 'dcj_fpm_admin_error', 'メールアドレスを正しく入力してください。', 30 );
@@ -2448,6 +2686,7 @@ class DCJ_Free_PDF_Mailer {
 			'optin_datetime'     => $now,
 			'last_seen_datetime' => $now,
 			'status'             => 'subscribed',
+			'tags'               => $tags,
 		);
 
 		if ( update_option( self::OPTION_SUBSCRIBERS, $subscribers ) ) {
@@ -2669,6 +2908,7 @@ class DCJ_Free_PDF_Mailer {
 
 			$lang        = ! empty( $candidate['lang'] ) ? sanitize_key( $candidate['lang'] ) : '';
 			$source_note = ! empty( $candidate['source_note'] ) ? sanitize_text_field( $candidate['source_note'] ) : '';
+			$tags        = ! empty( $candidate['tags'] ) ? $this->sanitize_newsletter_tags( $candidate['tags'] ) : array();
 
 			if ( ! in_array( $lang, array( 'ja', 'en' ), true ) ) {
 				$skipped++;
@@ -2683,6 +2923,7 @@ class DCJ_Free_PDF_Mailer {
 				'optin_datetime'     => $now,
 				'last_seen_datetime' => $now,
 				'status'             => 'subscribed',
+				'tags'               => $tags,
 			);
 			$existing_emails[ $email ] = true;
 			$success++;
@@ -3070,7 +3311,7 @@ class DCJ_Free_PDF_Mailer {
 	 * @param string $target 送信対象
 	 * @return bool
 	 */
-	private function is_newsletter_target_subscriber( $subscriber, $target ) {
+	private function is_newsletter_target_subscriber( $subscriber, $target, $tags = array() ) {
 
 		if ( ! is_array( $subscriber ) ) {
 			return false;
@@ -3088,10 +3329,18 @@ class DCJ_Free_PDF_Mailer {
 
 		if ( in_array( $target, array( 'ja', 'en' ), true ) ) {
 			$lang = ! empty( $subscriber['lang'] ) ? sanitize_key( $subscriber['lang'] ) : '';
-			return $target === $lang;
+			if ( $target !== $lang ) {
+				return false;
+			}
 		}
 
-		return true;
+		$tags = $this->sanitize_newsletter_tags( $tags );
+		if ( empty( $tags ) ) {
+			return true;
+		}
+
+		$subscriber_tags = $this->sanitize_newsletter_tags( ! empty( $subscriber['tags'] ) ? $subscriber['tags'] : array() );
+		return ! empty( array_intersect( $subscriber_tags, $tags ) );
 	}
 
 	/**
@@ -3100,13 +3349,14 @@ class DCJ_Free_PDF_Mailer {
 	 * @param string $target 送信対象
 	 * @return array
 	 */
-	private function get_newsletter_target_subscribers( $target ) {
+	private function get_newsletter_target_subscribers( $target, $tags = array() ) {
 
 		$target      = in_array( $target, array( 'all', 'ja', 'en' ), true ) ? $target : 'all';
+		$tags        = $this->sanitize_newsletter_tags( $tags );
 		$subscribers = array();
 
 		foreach ( $this->get_subscribers( 0 ) as $subscriber ) {
-			if ( $this->is_newsletter_target_subscriber( $subscriber, $target ) ) {
+			if ( $this->is_newsletter_target_subscriber( $subscriber, $target, $tags ) ) {
 				$email = strtolower( sanitize_email( $subscriber['email'] ) );
 				if ( ! empty( $email ) ) {
 					$subscribers[ $email ] = $subscriber;
@@ -3184,6 +3434,7 @@ class DCJ_Free_PDF_Mailer {
 		$action = sanitize_key( wp_unslash( $_POST['dcj_fpm_newsletter_action'] ) );
 		$target = ! empty( $_POST['dcj_fpm_newsletter_target'] ) ? sanitize_key( wp_unslash( $_POST['dcj_fpm_newsletter_target'] ) ) : 'all';
 		$target = in_array( $target, array( 'all', 'ja', 'en' ), true ) ? $target : 'all';
+		$tags   = ! empty( $_POST['dcj_fpm_newsletter_tags'] ) ? $this->sanitize_newsletter_tags( wp_unslash( $_POST['dcj_fpm_newsletter_tags'] ) ) : array();
 
 		$subject = ! empty( $_POST['dcj_fpm_newsletter_subject'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_fpm_newsletter_subject'] ) ) : '';
 		$body    = ! empty( $_POST['dcj_fpm_newsletter_body'] ) ? sanitize_textarea_field( wp_unslash( $_POST['dcj_fpm_newsletter_body'] ) ) : '';
@@ -3247,6 +3498,7 @@ class DCJ_Free_PDF_Mailer {
 
 			$template_target = ! empty( $template['target'] ) ? sanitize_key( $template['target'] ) : 'all';
 			$template_target = in_array( $template_target, array( 'all', 'ja', 'en' ), true ) ? $template_target : 'all';
+			$template_tags   = ! empty( $template['tags'] ) ? $this->sanitize_newsletter_tags( $template['tags'] ) : array();
 			$templates       = $this->get_newsletter_templates();
 			array_unshift(
 				$templates,
@@ -3254,6 +3506,7 @@ class DCJ_Free_PDF_Mailer {
 					'id'         => wp_generate_password( 16, false, false ),
 					'name'       => ( ! empty( $template['name'] ) ? sanitize_text_field( $template['name'] ) : '' ) . ' コピー',
 					'target'     => $template_target,
+					'tags'       => $template_tags,
 					'subject'    => ! empty( $template['subject'] ) ? sanitize_text_field( $template['subject'] ) : '',
 					'body'       => ! empty( $template['body'] ) ? sanitize_textarea_field( $template['body'] ) : '',
 					'updated_at' => current_time( 'mysql' ),
@@ -3317,6 +3570,7 @@ class DCJ_Free_PDF_Mailer {
 							'id'         => $template_edit_id,
 							'name'       => $template_name,
 							'target'     => $target,
+							'tags'       => $tags,
 							'subject'    => $subject,
 							'body'       => $body,
 							'updated_at' => current_time( 'mysql' ),
@@ -3343,6 +3597,7 @@ class DCJ_Free_PDF_Mailer {
 					'id'         => wp_generate_password( 16, false, false ),
 					'name'       => $template_name,
 					'target'     => $target,
+					'tags'       => $tags,
 					'subject'    => $subject,
 					'body'       => $body,
 					'updated_at' => current_time( 'mysql' ),
@@ -3375,11 +3630,12 @@ class DCJ_Free_PDF_Mailer {
 		if ( 'preview' === $action ) {
 			$this->clear_current_newsletter_preview();
 
-			$target_subscribers = $this->get_newsletter_target_subscribers( $target );
+			$target_subscribers = $this->get_newsletter_target_subscribers( $target, $tags );
 			$token              = wp_generate_password( 20, false, false );
 			$preview            = array(
 				'token'        => $token,
 				'target'       => $target,
+				'tags'         => $tags,
 				'subject'      => $subject,
 				'body'         => $body,
 				'target_count' => count( $target_subscribers ),
@@ -3416,6 +3672,7 @@ class DCJ_Free_PDF_Mailer {
 		}
 
 		$target  = ! empty( $preview['target'] ) ? sanitize_key( $preview['target'] ) : 'all';
+		$tags    = ! empty( $preview['tags'] ) ? $this->sanitize_newsletter_tags( $preview['tags'] ) : array();
 		$subject = ! empty( $preview['subject'] ) ? sanitize_text_field( $preview['subject'] ) : '';
 		$body    = ! empty( $preview['body'] ) ? sanitize_textarea_field( $preview['body'] ) : '';
 
@@ -3424,7 +3681,7 @@ class DCJ_Free_PDF_Mailer {
 			return false;
 		}
 
-		$target_subscribers = $this->get_newsletter_target_subscribers( $target );
+		$target_subscribers = $this->get_newsletter_target_subscribers( $target, $tags );
 		$headers            = $this->get_newsletter_mail_headers();
 		$success            = 0;
 		$failed             = 0;
@@ -3478,6 +3735,7 @@ class DCJ_Free_PDF_Mailer {
 		$posted_action = ! empty( $_POST['dcj_fpm_newsletter_action'] ) ? sanitize_key( wp_unslash( $_POST['dcj_fpm_newsletter_action'] ) ) : '';
 		$posted_target = ! empty( $_POST['dcj_fpm_newsletter_target'] ) ? sanitize_key( wp_unslash( $_POST['dcj_fpm_newsletter_target'] ) ) : 'all';
 		$posted_target = in_array( $posted_target, array( 'all', 'ja', 'en' ), true ) ? $posted_target : 'all';
+		$posted_tags   = ! empty( $_POST['dcj_fpm_newsletter_tags'] ) ? $this->sanitize_newsletter_tags( wp_unslash( $_POST['dcj_fpm_newsletter_tags'] ) ) : array();
 		$posted_subject = ! empty( $_POST['dcj_fpm_newsletter_subject'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_fpm_newsletter_subject'] ) ) : '';
 		$posted_body    = ! empty( $_POST['dcj_fpm_newsletter_body'] ) ? sanitize_textarea_field( wp_unslash( $_POST['dcj_fpm_newsletter_body'] ) ) : '';
 		$posted_test_to = ! empty( $_POST['dcj_fpm_newsletter_test_to'] ) ? sanitize_email( wp_unslash( $_POST['dcj_fpm_newsletter_test_to'] ) ) : '';
@@ -3488,6 +3746,7 @@ class DCJ_Free_PDF_Mailer {
 		if ( is_array( $loaded_template ) ) {
 			$posted_target  = ! empty( $loaded_template['target'] ) ? sanitize_key( $loaded_template['target'] ) : $posted_target;
 			$posted_target  = in_array( $posted_target, array( 'all', 'ja', 'en' ), true ) ? $posted_target : 'all';
+			$posted_tags    = ! empty( $loaded_template['tags'] ) ? $this->sanitize_newsletter_tags( $loaded_template['tags'] ) : array();
 			$posted_subject = ! empty( $loaded_template['subject'] ) ? sanitize_text_field( $loaded_template['subject'] ) : '';
 			$posted_body    = ! empty( $loaded_template['body'] ) ? sanitize_textarea_field( $loaded_template['body'] ) : '';
 			delete_transient( 'dcj_fpm_newsletter_loaded_template_' . get_current_user_id() );
@@ -3499,6 +3758,7 @@ class DCJ_Free_PDF_Mailer {
 			$template_name    = ! empty( $editing_template['name'] ) ? sanitize_text_field( $editing_template['name'] ) : '';
 			$posted_target    = ! empty( $editing_template['target'] ) ? sanitize_key( $editing_template['target'] ) : $posted_target;
 			$posted_target    = in_array( $posted_target, array( 'all', 'ja', 'en' ), true ) ? $posted_target : 'all';
+			$posted_tags      = ! empty( $editing_template['tags'] ) ? $this->sanitize_newsletter_tags( $editing_template['tags'] ) : array();
 			$posted_subject   = ! empty( $editing_template['subject'] ) ? sanitize_text_field( $editing_template['subject'] ) : '';
 			$posted_body      = ! empty( $editing_template['body'] ) ? sanitize_textarea_field( $editing_template['body'] ) : '';
 		}
@@ -3509,6 +3769,7 @@ class DCJ_Free_PDF_Mailer {
 
 		if ( is_array( $preview ) ) {
 			$posted_target  = ! empty( $preview['target'] ) ? sanitize_key( $preview['target'] ) : $posted_target;
+			$posted_tags    = ! empty( $preview['tags'] ) ? $this->sanitize_newsletter_tags( $preview['tags'] ) : array();
 			$posted_subject = ! empty( $preview['subject'] ) ? sanitize_text_field( $preview['subject'] ) : $posted_subject;
 			$posted_body    = ! empty( $preview['body'] ) ? sanitize_textarea_field( $preview['body'] ) : $posted_body;
 		}
@@ -3535,6 +3796,18 @@ class DCJ_Free_PDF_Mailer {
 							<option value="ja" <?php selected( $posted_target, 'ja' ); ?>><?php echo esc_html( '日本語購読者' ); ?></option>
 							<option value="en" <?php selected( $posted_target, 'en' ); ?>><?php echo esc_html( '英語購読者' ); ?></option>
 						</select>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><?php echo esc_html( '配信カテゴリ' ); ?></th>
+					<td>
+						<?php foreach ( $this->get_newsletter_tag_options() as $tag_value => $tag_label ) : ?>
+							<label style="display: inline-block; margin: 0 1em 0.4em 0;">
+								<input type="checkbox" name="dcj_fpm_newsletter_tags[]" value="<?php echo esc_attr( $tag_value ); ?>" <?php checked( in_array( $tag_value, $posted_tags, true ) ); ?> />
+								<?php echo esc_html( $tag_label ); ?>
+							</label>
+						<?php endforeach; ?>
+						<p class="description"><?php echo esc_html( '未選択の場合は配信カテゴリで絞り込まず、送信対象の言語条件だけで抽出します。複数選択時は、いずれかのカテゴリを持つ購読者が対象です。' ); ?></p>
 					</td>
 				</tr>
 				<tr>
@@ -3575,6 +3848,7 @@ class DCJ_Free_PDF_Mailer {
 					<tr>
 						<th><?php echo esc_html( 'テンプレート名' ); ?></th>
 						<th><?php echo esc_html( '送信対象' ); ?></th>
+						<th><?php echo esc_html( '配信カテゴリ' ); ?></th>
 						<th><?php echo esc_html( '件名' ); ?></th>
 						<th><?php echo esc_html( '更新日時' ); ?></th>
 						<th><?php echo esc_html( '操作' ); ?></th>
@@ -3593,6 +3867,7 @@ class DCJ_Free_PDF_Mailer {
 						<tr>
 							<td><?php echo esc_html( ! empty( $template['name'] ) ? $template['name'] : '' ); ?></td>
 							<td><?php echo esc_html( $this->get_newsletter_target_label( $template_target ) ); ?></td>
+							<td><?php echo esc_html( ! empty( $template['tags'] ) ? implode( ' / ', $this->get_newsletter_tag_labels( $template['tags'] ) ) : '-' ); ?></td>
 							<td><?php echo esc_html( ! empty( $template['subject'] ) ? $template['subject'] : '' ); ?></td>
 							<td><?php echo esc_html( ! empty( $template['updated_at'] ) ? $template['updated_at'] : '' ); ?></td>
 							<td>
@@ -3629,6 +3904,10 @@ class DCJ_Free_PDF_Mailer {
 					<tr>
 						<th><?php echo esc_html( '送信対象' ); ?></th>
 						<td><?php echo esc_html( $this->get_newsletter_target_label( $posted_target ) ); ?></td>
+					</tr>
+					<tr>
+						<th><?php echo esc_html( '配信カテゴリ' ); ?></th>
+						<td><?php echo esc_html( ! empty( $posted_tags ) ? implode( ' / ', $this->get_newsletter_tag_labels( $posted_tags ) ) : '指定なし' ); ?></td>
 					</tr>
 					<tr>
 						<th><?php echo esc_html( '対象購読者数' ); ?></th>
@@ -3830,6 +4109,15 @@ class DCJ_Free_PDF_Mailer {
 			</select>
 			<label for="dcj-manual-subscriber-source-note"><?php echo esc_html( '登録元メモ' ); ?></label>
 			<input type="text" id="dcj-manual-subscriber-source-note" name="dcj_manual_subscriber_source_note" value="" placeholder="<?php echo esc_attr( '例：店頭申込、個別同意など' ); ?>">
+			<fieldset style="display: inline-block; margin: 0 1em 0.5em 0; vertical-align: top;">
+				<legend><?php echo esc_html( '配信カテゴリ' ); ?></legend>
+				<?php foreach ( $this->get_newsletter_tag_options() as $tag_value => $tag_label ) : ?>
+					<label style="display: inline-block; margin: 0 0.8em 0.3em 0;">
+						<input type="checkbox" name="dcj_manual_subscriber_tags[]" value="<?php echo esc_attr( $tag_value ); ?>">
+						<?php echo esc_html( $tag_label ); ?>
+					</label>
+				<?php endforeach; ?>
+			</fieldset>
 			<label for="dcj-manual-subscriber-consent-confirmed">
 				<input type="checkbox" id="dcj-manual-subscriber-consent-confirmed" name="dcj_manual_subscriber_consent_confirmed" value="1" required>
 				<?php echo esc_html( '同意確認済み' ); ?> *
@@ -3838,6 +4126,25 @@ class DCJ_Free_PDF_Mailer {
 		</form>
 		<h3 id="dcj-subscriber-csv-import"><?php echo esc_html( '購読者CSVインポート' ); ?></h3>
 		<p><?php echo esc_html( 'CSV形式で、同意確認済みの購読者をまとめて登録できます。文字コードはUTF-8推奨です。emailは必須、langは ja または en、statusは active を推奨します。インポート前に必ずプレビューを確認してください。' ); ?></p>
+		<p><?php echo esc_html( 'tags列は「|」区切りで入力します。日本語タグ名または英語tagIDのどちらでも入力できます。区切り記号「|」を入れ忘れると正しく分割されません。' ); ?></p>
+		<p><?php echo esc_html( '空白が入ってもできるだけ自動判定しますが、基本は下の対応表の名称をコピーしてください。' ); ?></p>
+		<p><?php echo esc_html( '例：新作塗り絵PDF案内|子ども向け塗り絵案内 または new_pdf|kids' ); ?></p>
+		<table class="widefat striped" style="max-width: 560px;">
+			<thead>
+				<tr>
+					<th><?php echo esc_html( '日本語タグ名' ); ?></th>
+					<th><?php echo esc_html( '英語tagID' ); ?></th>
+				</tr>
+			</thead>
+			<tbody>
+				<?php foreach ( $this->get_newsletter_tag_options() as $tag_value => $tag_label ) : ?>
+					<tr>
+						<td><?php echo esc_html( $tag_label ); ?></td>
+						<td><code><?php echo esc_html( $tag_value ); ?></code></td>
+					</tr>
+				<?php endforeach; ?>
+			</tbody>
+		</table>
 		<p><?php echo esc_html( 'はじめてCSVを作成する場合は、下のCSVテンプレートをダウンロードして、形式を確認してから編集してください。' ); ?></p>
 		<p>
 			<a class="button button-secondary" href="<?php echo esc_url( $csv_template_url ); ?>"><?php echo esc_html( 'CSVテンプレートをダウンロード' ); ?></a>
@@ -3983,6 +4290,7 @@ class DCJ_Free_PDF_Mailer {
 						<th><?php echo esc_html( '登録元タイトル' ); ?></th>
 						<th><?php echo esc_html( '初回同意日時' ); ?></th>
 						<th><?php echo esc_html( '最終同意日時' ); ?></th>
+						<th><?php echo esc_html( '配信カテゴリ' ); ?></th>
 						<th><?php echo esc_html( '状態' ); ?></th>
 						<th><?php echo esc_html( '操作' ); ?></th>
 					</tr>
@@ -4028,6 +4336,7 @@ class DCJ_Free_PDF_Mailer {
 							<td><?php echo esc_html( ! empty( $subscriber['source_title'] ) ? $subscriber['source_title'] : '' ); ?></td>
 							<td><?php echo esc_html( ! empty( $subscriber['optin_datetime'] ) ? $subscriber['optin_datetime'] : '' ); ?></td>
 							<td><?php echo esc_html( ! empty( $subscriber['last_seen_datetime'] ) ? $subscriber['last_seen_datetime'] : '' ); ?></td>
+							<td><?php echo esc_html( ! empty( $subscriber['tags'] ) ? implode( ' / ', $this->get_newsletter_tag_labels( $subscriber['tags'] ) ) : '-' ); ?></td>
 							<td><?php echo esc_html( DCJ_FPM_Subscriber_Helper::get_status_label( $subscriber_status ) ); ?></td>
 							<td>
 								<a href="<?php echo esc_url( $status_url ); ?>" onclick="return confirm('<?php echo esc_attr( $confirm_message ); ?>');"><?php echo esc_html( $action_label ); ?></a>
@@ -4081,6 +4390,7 @@ class DCJ_Free_PDF_Mailer {
 		$lang                = ! empty( $_POST['dcj_lang'] ) ? sanitize_key( wp_unslash( $_POST['dcj_lang'] ) ) : 'ja';
 		$type                = ! empty( $_POST['dcj_type'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_type'] ) ) : 'set';
 		$category            = ! empty( $_POST['dcj_category'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_category'] ) ) : '';
+		$tags                = ! empty( $_POST['dcj_newsletter_tags'] ) ? $this->sanitize_newsletter_tags( wp_unslash( $_POST['dcj_newsletter_tags'] ) ) : array();
 		$audience            = ! empty( $_POST['dcj_audience'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_audience'] ) ) : '';
 		$audience_label      = ! empty( $_POST['dcj_audience_label'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_audience_label'] ) ) : '';
 		$volume_label        = ! empty( $_POST['dcj_volume_label'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_volume_label'] ) ) : '';
@@ -4117,6 +4427,7 @@ class DCJ_Free_PDF_Mailer {
 			'enabled'           => $enabled,
 			'type'              => $type,
 			'category'          => $category,
+			'tags'              => $tags,
 			'audience'          => $audience,
 			'audience_label'    => $audience_label,
 			'volume_label'      => $volume_label,
@@ -4159,6 +4470,7 @@ class DCJ_Free_PDF_Mailer {
 			'lang'              => 'ja',
 			'type'              => 'set',
 			'category'          => 'book_image',
+			'tags'              => array(),
 			'audience'          => 'preschool',
 			'audience_label'    => '幼児向け・3〜6歳',
 			'volume_label'      => 'PDF 5枚セット',
@@ -4204,6 +4516,7 @@ class DCJ_Free_PDF_Mailer {
 						'lang',
 						'type',
 						'category',
+						'tags',
 						'audience',
 						'audience_label',
 						'volume_label',
@@ -4281,6 +4594,19 @@ class DCJ_Free_PDF_Mailer {
 								<option value="<?php echo esc_attr( $category_value ); ?>" <?php selected( $add_values['category'], $category_value ); ?>><?php echo esc_html( $category_label ); ?></option>
 							<?php endforeach; ?>
 						</select>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><?php echo esc_html( '配信カテゴリ' ); ?></th>
+					<td>
+						<?php $selected_newsletter_tags = $this->sanitize_newsletter_tags( ! empty( $add_values['tags'] ) ? $add_values['tags'] : array() ); ?>
+						<?php foreach ( $this->get_newsletter_tag_options() as $tag_value => $tag_label ) : ?>
+							<label style="display: inline-block; margin: 0 1em 0.4em 0;">
+								<input type="checkbox" name="dcj_newsletter_tags[]" value="<?php echo esc_attr( $tag_value ); ?>" <?php checked( in_array( $tag_value, $selected_newsletter_tags, true ) ); ?> />
+								<?php echo esc_html( $tag_label ); ?>
+							</label>
+						<?php endforeach; ?>
+						<p class="description"><?php echo esc_html( 'この無料PDFに申し込んだユーザーがメルマガ同意ありの場合、選択した配信カテゴリを購読者タグとして追加します。公開フォームには表示されません。' ); ?></p>
 					</td>
 				</tr>
 				<tr>
@@ -4565,6 +4891,19 @@ class DCJ_Free_PDF_Mailer {
 								<option value="<?php echo esc_attr( $category_value ); ?>" <?php selected( ! empty( $pdf_item['category'] ) ? $pdf_item['category'] : '', $category_value ); ?>><?php echo esc_html( $category_label ); ?></option>
 							<?php endforeach; ?>
 						</select>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><?php echo esc_html( '配信カテゴリ' ); ?></th>
+					<td>
+						<?php $selected_newsletter_tags = $this->sanitize_newsletter_tags( ! empty( $pdf_item['tags'] ) ? $pdf_item['tags'] : array() ); ?>
+						<?php foreach ( $this->get_newsletter_tag_options() as $tag_value => $tag_label ) : ?>
+							<label style="display: inline-block; margin: 0 1em 0.4em 0;">
+								<input type="checkbox" name="dcj_newsletter_tags[]" value="<?php echo esc_attr( $tag_value ); ?>" <?php checked( in_array( $tag_value, $selected_newsletter_tags, true ) ); ?> />
+								<?php echo esc_html( $tag_label ); ?>
+							</label>
+						<?php endforeach; ?>
+						<p class="description"><?php echo esc_html( 'この無料PDFに申し込んだユーザーがメルマガ同意ありの場合、選択した配信カテゴリを購読者タグとして追加します。公開フォームには表示されません。' ); ?></p>
 					</td>
 				</tr>
 				<tr>
