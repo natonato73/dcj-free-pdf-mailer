@@ -3,7 +3,7 @@
  * Plugin Name: DCJ Free PDF Mailer
  * Plugin URI: https://dreamcoloringjourney.com/
  * Description: Dream Coloring Journey の無料PDF配布フォーム用プラグインです。ショートコードIDごとに無料PDFメールを送信します。
- * Version: 1.6.1
+ * Version: 1.6.2
  * Author: 名富企画
  * Author URI: https://dreamcoloringjourney.com/
  * License: GPL2
@@ -33,7 +33,7 @@ class DCJ_Free_PDF_Mailer {
 	/**
 	 * プラグイン定数
 	 */
-	const VERSION                     = '1.6.1';
+	const VERSION                     = '1.6.2';
 	const PLUGIN_SLUG                 = 'dcj-free-pdf-mailer';
 	const CSS_PREFIX                  = 'dcj-fpm-';
 	const NONCE_ACTION                = 'dcj_free_pdf_submit';
@@ -52,6 +52,13 @@ class DCJ_Free_PDF_Mailer {
 	 * @var array
 	 */
 	private static $messages = array();
+
+	/**
+	 * 公開側フォームの表示回数
+	 *
+	 * @var array
+	 */
+	private $form_render_counts = array();
 
 	/**
 	 * コンストラクタ
@@ -1199,8 +1206,11 @@ class DCJ_Free_PDF_Mailer {
 			false
 		);
 
-		// 1ページに複数フォームを置いてもIDが重複しないようにする
-		$email_input_id = self::CSS_PREFIX . 'email-' . $pdf_id;
+		$form_anchor_id    = $this->get_form_anchor_id( $pdf_id );
+		$form_action_url   = $this->get_form_action_url( $form_anchor_id );
+		$email_input_id    = $form_anchor_id . '-email';
+		$form_id           = $form_anchor_id . '-form';
+		$recaptcha_input_id = $form_anchor_id . '-recaptcha-token';
 
 		$title       = ! empty( $pdf_item['title'] ) ? $pdf_item['title'] : '無料PDFをメールで受け取る';
 		$description = ! empty( $pdf_item['description'] ) ? $pdf_item['description'] : 'メールアドレスを入力すると、無料PDFのご案内をお送りします。';
@@ -1228,11 +1238,8 @@ class DCJ_Free_PDF_Mailer {
 			: 'You can receive the free PDF even if you do not check this box. Updates and coupons are sent occasionally.';
 		$mail_settings      = $this->get_mail_settings();
 		$recaptcha_enabled  = DCJ_FPM_Recaptcha::is_ready( $mail_settings );
-		$form_id            = self::CSS_PREFIX . 'form-' . $pdf_id;
-		$recaptcha_input_id = self::CSS_PREFIX . 'recaptcha-token-' . $pdf_id;
-
-		$html  = '<div class="' . esc_attr( self::CSS_PREFIX . 'form-container' ) . '" data-pdf-id="' . esc_attr( $pdf_id ) . '">';
-		$html .= '<form method="post" action="" id="' . esc_attr( $form_id ) . '" class="' . esc_attr( self::CSS_PREFIX . 'form' ) . '">';
+		$html  = '<div id="' . esc_attr( $form_anchor_id ) . '" class="' . esc_attr( self::CSS_PREFIX . 'form-container' ) . '" data-pdf-id="' . esc_attr( $pdf_id ) . '">';
+		$html .= '<form method="post" action="' . esc_url( $form_action_url ) . '" id="' . esc_attr( $form_id ) . '" class="' . esc_attr( self::CSS_PREFIX . 'form' ) . '">';
 
 		// nonce
 		$html .= $nonce_field;
@@ -1242,6 +1249,9 @@ class DCJ_Free_PDF_Mailer {
 
 		// PDF識別ID
 		$html .= '<input type="hidden" name="dcj_pdf_id" value="' . esc_attr( $pdf_id ) . '" />';
+
+		// 送信後に送信元フォーム位置へ戻るためのアンカーID
+		$html .= '<input type="hidden" name="dcj_fpm_anchor" value="' . esc_attr( $form_anchor_id ) . '" />';
 
 		if ( $recaptcha_enabled ) {
 			$html .= '<input type="hidden" id="' . esc_attr( $recaptcha_input_id ) . '" name="dcj_recaptcha_token" value="" />';
@@ -1297,7 +1307,8 @@ class DCJ_Free_PDF_Mailer {
 		$html .= '</div>';
 
 		// 処理結果メッセージ（補足文の下に表示）
-		if ( isset( self::$messages[ $pdf_id ] ) ) {
+		$submitted_anchor_id = $this->get_submitted_form_anchor_id();
+		if ( isset( self::$messages[ $pdf_id ] ) && ( empty( $submitted_anchor_id ) || $submitted_anchor_id === $form_anchor_id ) ) {
 			$html .= self::$messages[ $pdf_id ];
 		}
 
@@ -1329,6 +1340,62 @@ class DCJ_Free_PDF_Mailer {
 		$html .= '</div>';
 
 		return $html;
+	}
+
+	/**
+	 * フォーム外枠に付与するアンカーIDを生成します。
+	 *
+	 * @param string $pdf_id PDFの識別ID
+	 * @return string アンカーID
+	 */
+	private function get_form_anchor_id( $pdf_id ) {
+		$pdf_id = sanitize_key( $pdf_id );
+
+		if ( empty( $this->form_render_counts[ $pdf_id ] ) ) {
+			$this->form_render_counts[ $pdf_id ] = 0;
+		}
+
+		$this->form_render_counts[ $pdf_id ]++;
+
+		$anchor_id = self::CSS_PREFIX . 'form-' . $pdf_id;
+		if ( 1 < $this->form_render_counts[ $pdf_id ] ) {
+			$anchor_id .= '-' . absint( $this->form_render_counts[ $pdf_id ] );
+		}
+
+		return sanitize_key( $anchor_id );
+	}
+
+	/**
+	 * 送信後にフォーム位置へ戻るためのURLを生成します。
+	 *
+	 * @param string $anchor_id アンカーID
+	 * @return string フォーム送信先URL
+	 */
+	private function get_form_action_url( $anchor_id ) {
+		$anchor_id = sanitize_key( $anchor_id );
+
+		if ( empty( $_SERVER['REQUEST_URI'] ) ) {
+			return '#' . $anchor_id;
+		}
+
+		$request_uri = sanitize_text_field( wp_unslash( $_SERVER['REQUEST_URI'] ) );
+		$request_uri = explode( '#', $request_uri, 2 );
+		$request_uri = $request_uri[0];
+
+		return home_url( $request_uri ) . '#' . $anchor_id;
+	}
+
+	/**
+	 * 送信元フォームのアンカーIDを取得します。
+	 *
+	 * @return string アンカーID
+	 */
+	private function get_submitted_form_anchor_id() {
+		if ( empty( $_POST['dcj_fpm_anchor'] ) ) {
+			return '';
+		}
+
+		return sanitize_key( wp_unslash( $_POST['dcj_fpm_anchor'] ) );
 	}
 
 	/**
