@@ -3,7 +3,7 @@
  * Plugin Name: DCJ Free PDF Mailer
  * Plugin URI: https://dreamcoloringjourney.com/
  * Description: Dream Coloring Journey の無料PDF配布フォーム用プラグインです。ショートコードIDごとに無料PDFメールを送信します。
- * Version: 1.6.2
+ * Version: 1.7.0
  * Author: 名富企画
  * Author URI: https://dreamcoloringjourney.com/
  * License: GPL2
@@ -33,7 +33,7 @@ class DCJ_Free_PDF_Mailer {
 	/**
 	 * プラグイン定数
 	 */
-	const VERSION                     = '1.6.2';
+	const VERSION                     = '1.7.0';
 	const PLUGIN_SLUG                 = 'dcj-free-pdf-mailer';
 	const CSS_PREFIX                  = 'dcj-fpm-';
 	const NONCE_ACTION                = 'dcj_free_pdf_submit';
@@ -1794,16 +1794,20 @@ class DCJ_Free_PDF_Mailer {
 		?>
 		<div class="wrap">
 			<h1><?php echo esc_html( 'DCJ Free PDF Mailer' ); ?></h1>
+
+			<?php $this->render_admin_jump_links(); ?>
 			
 			<div class="notice notice-info inline">
 				<p><?php echo esc_html( 'PDF設定、メール送信設定、送信ログ、購読者リストをこの画面で管理できます。' ); ?></p>
 			</div>
 
-			<?php $this->render_mail_settings_form(); ?>
-			<?php $this->render_mail_diagnostics(); ?>
+			<?php $this->render_admin_section_start( 'mail-settings' ); ?>
+				<?php $this->render_mail_settings_form(); ?>
+				<?php $this->render_mail_diagnostics(); ?>
+			<?php $this->render_admin_section_end(); ?>
 			
-			<h2><?php echo esc_html( 'PDF設定一覧' ); ?></h2>
-                        <p><?php echo esc_html( '登録済みの無料PDF設定を確認できます。ショートコードを固定ページや投稿に貼り付けると、申込フォームを表示できます。' ); ?></p>
+			<?php $this->render_admin_section_start( 'pdf-list' ); ?>
+			<p><?php echo esc_html( '登録済みの無料PDF設定を確認できます。ショートコードを固定ページや投稿に貼り付けると、申込フォームを表示できます。' ); ?></p>
 			
 			<table class="widefat striped">
 				<thead>
@@ -1905,11 +1909,271 @@ class DCJ_Free_PDF_Mailer {
 					<?php $this->render_admin_preview_form( $pdf_items, $edit_pdf_id ); ?>
 				</div>
 			</div>
+			<?php $this->render_admin_section_end(); ?>
 
-			<?php $this->render_submission_logs(); ?>
-			<?php $this->render_subscribers(); ?>
-			<?php $this->render_newsletter_broadcast(); ?>
+			<?php $this->render_admin_section_start( 'send-logs' ); ?>
+				<?php $this->render_submission_logs(); ?>
+			<?php $this->render_admin_section_end(); ?>
+
+			<?php $this->render_admin_section_start( 'subscribers' ); ?>
+				<?php $this->render_subscribers(); ?>
+			<?php $this->render_admin_section_end(); ?>
+
+			<?php $this->render_admin_section_start( 'newsletter' ); ?>
+				<span id="dcj-newsletter-broadcast"></span>
+				<?php $this->render_newsletter_broadcast(); ?>
+			<?php $this->render_admin_section_end(); ?>
+
+			<?php $this->render_admin_section_start( 'download-report' ); ?>
+				<?php $this->render_download_report_placeholder(); ?>
+			<?php $this->render_admin_section_end(); ?>
+
+			<?php $this->render_admin_collapsible_script(); ?>
 		</div>
+		<?php
+	}
+
+	/**
+	 * 管理画面の主要セクション定義を取得します。
+	 *
+	 * @return array
+	 */
+	private function get_admin_sections() {
+		return array(
+			'mail-settings'   => array(
+				'id'           => 'dcj-fpm-section-mail-settings',
+				'label'        => 'メール送信設定',
+				'default_open' => false,
+			),
+			'pdf-list'        => array(
+				'id'           => 'dcj-fpm-section-pdf-list',
+				'label'        => 'PDF設定一覧',
+				'default_open' => true,
+			),
+			'send-logs'       => array(
+				'id'           => 'dcj-fpm-section-send-logs',
+				'label'        => '送信ログ',
+				'default_open' => false,
+			),
+			'subscribers'     => array(
+				'id'           => 'dcj-fpm-section-subscribers',
+				'label'        => '購読者リスト',
+				'default_open' => true,
+			),
+			'newsletter'      => array(
+				'id'           => 'dcj-fpm-section-newsletter',
+				'label'        => 'メルマガ送信',
+				'default_open' => false,
+			),
+			'download-report' => array(
+				'id'           => 'dcj-fpm-section-download-report',
+				'label'        => 'ダウンロードレポート',
+				'default_open' => false,
+			),
+		);
+	}
+
+	/**
+	 * 管理画面上部のジャンプリンクを表示します。
+	 */
+	private function render_admin_jump_links() {
+		$sections = $this->get_admin_sections();
+		?>
+		<nav class="dcj-fpm-admin-jump-links" aria-label="<?php echo esc_attr( '管理画面セクション' ); ?>">
+			<?php foreach ( $sections as $section ) : ?>
+				<a href="#<?php echo esc_attr( $section['id'] ); ?>"><?php echo esc_html( $section['label'] ); ?></a>
+			<?php endforeach; ?>
+		</nav>
+		<?php
+	}
+
+	/**
+	 * 折りたたみ可能な管理画面セクションを開始します。
+	 *
+	 * @param string $section_key セクションキー
+	 */
+	private function render_admin_section_start( $section_key ) {
+		$sections = $this->get_admin_sections();
+		if ( empty( $sections[ $section_key ] ) ) {
+			return;
+		}
+
+		$section = $sections[ $section_key ];
+		$body_id = $section['id'] . '-body';
+		?>
+		<section id="<?php echo esc_attr( $section['id'] ); ?>" class="dcj-fpm-admin-section" data-dcj-fpm-section="<?php echo esc_attr( $section_key ); ?>" data-default-open="<?php echo esc_attr( ! empty( $section['default_open'] ) ? '1' : '0' ); ?>">
+			<h2 class="dcj-fpm-admin-section-title">
+				<button type="button" class="dcj-fpm-admin-section-toggle" aria-expanded="true" aria-controls="<?php echo esc_attr( $body_id ); ?>">
+					<span class="dcj-fpm-admin-section-icon" aria-hidden="true"><?php echo esc_html( '▼' ); ?></span>
+					<span><?php echo esc_html( $section['label'] ); ?></span>
+				</button>
+			</h2>
+			<div id="<?php echo esc_attr( $body_id ); ?>" class="dcj-fpm-admin-section-body">
+		<?php
+	}
+
+	/**
+	 * 折りたたみ可能な管理画面セクションを終了します。
+	 */
+	private function render_admin_section_end() {
+		?>
+			</div>
+		</section>
+		<?php
+	}
+
+	/**
+	 * ダウンロードレポートの準備中表示を出力します。
+	 */
+	private function render_download_report_placeholder() {
+		?>
+		<p><?php echo esc_html( 'ダウンロードレポートは今後の拡張予定です。現時点では Download Monitor のレポート画面をご確認ください。' ); ?></p>
+		<?php
+	}
+
+	/**
+	 * 管理画面セクションの折りたたみUIを出力します。
+	 */
+	private function render_admin_collapsible_script() {
+		?>
+		<style>
+			.dcj-fpm-admin-jump-links {
+				display: flex;
+				flex-wrap: wrap;
+				gap: 6px;
+				margin: 8px 0 12px;
+			}
+			.dcj-fpm-admin-jump-links a {
+				border: 1px solid #c3c4c7;
+				border-radius: 3px;
+				background: #fff;
+				padding: 3px 8px;
+				text-decoration: none;
+				font-size: 12px;
+				line-height: 1.8;
+			}
+			.dcj-fpm-admin-section {
+				margin: 14px 0;
+			}
+			.dcj-fpm-admin-section-title {
+				margin: 0;
+			}
+			.dcj-fpm-admin-section-toggle {
+				display: inline-flex;
+				align-items: center;
+				gap: 6px;
+				margin: 0 0 8px;
+				border: 0;
+				background: transparent;
+				padding: 0;
+				color: #1d2327;
+				font-size: 1.3em;
+				font-weight: 600;
+				cursor: pointer;
+			}
+			.dcj-fpm-admin-section-toggle:focus {
+				outline: 2px solid #2271b1;
+				outline-offset: 2px;
+			}
+			.dcj-fpm-admin-section-icon {
+				display: inline-block;
+				min-width: 1em;
+			}
+			.dcj-fpm-admin-section.is-collapsed .dcj-fpm-admin-section-icon {
+				transform: rotate(-90deg);
+			}
+		</style>
+		<script>
+		(function() {
+			var storageKey = 'dcj_fpm_admin_section_open_states';
+			var sections = document.querySelectorAll('.dcj-fpm-admin-section[data-dcj-fpm-section]');
+			var states = {};
+
+			function readStates() {
+				try {
+					var raw = window.localStorage ? window.localStorage.getItem(storageKey) : '';
+					states = raw ? JSON.parse(raw) : {};
+				} catch (error) {
+					states = {};
+				}
+			}
+
+			function writeStates() {
+				try {
+					if (window.localStorage) {
+						window.localStorage.setItem(storageKey, JSON.stringify(states));
+					}
+				} catch (error) {}
+			}
+
+			function setSectionOpen(section, isOpen) {
+				var button = section.querySelector('.dcj-fpm-admin-section-toggle');
+				var body = section.querySelector('.dcj-fpm-admin-section-body');
+
+				if (!button || !body) {
+					return;
+				}
+
+				section.classList.toggle('is-collapsed', !isOpen);
+				button.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+				body.hidden = !isOpen;
+			}
+
+			function openSectionForElement(element) {
+				var section;
+				var key;
+
+				if (!element) {
+					return;
+				}
+
+				section = element.classList && element.classList.contains('dcj-fpm-admin-section')
+					? element
+					: element.closest('.dcj-fpm-admin-section');
+
+				if (!section) {
+					return;
+				}
+
+				key = section.getAttribute('data-dcj-fpm-section');
+				states[key] = true;
+				setSectionOpen(section, true);
+				writeStates();
+			}
+
+			readStates();
+
+			sections.forEach(function(section) {
+				var key = section.getAttribute('data-dcj-fpm-section');
+				var defaultOpen = section.getAttribute('data-default-open') === '1';
+				var isOpen = Object.prototype.hasOwnProperty.call(states, key) ? !!states[key] : defaultOpen;
+				var button = section.querySelector('.dcj-fpm-admin-section-toggle');
+
+				setSectionOpen(section, isOpen);
+
+				if (!button) {
+					return;
+				}
+
+				button.addEventListener('click', function() {
+					var nextOpen = button.getAttribute('aria-expanded') !== 'true';
+					states[key] = nextOpen;
+					setSectionOpen(section, nextOpen);
+					writeStates();
+				});
+			});
+
+			if (window.location.hash) {
+				openSectionForElement(document.getElementById(window.location.hash.substring(1)));
+			}
+
+			document.querySelectorAll('.dcj-fpm-admin-jump-links a[href^="#"]').forEach(function(link) {
+				link.addEventListener('click', function() {
+					openSectionForElement(document.getElementById(link.getAttribute('href').substring(1)));
+				});
+			});
+		})();
+		</script>
 		<?php
 	}
 
@@ -2080,7 +2344,6 @@ class DCJ_Free_PDF_Mailer {
 		$mail_settings = $this->get_mail_settings();
 
 		?>
-		<h2><?php echo esc_html( 'メール送信設定' ); ?></h2>
 		<p><?php echo esc_html( '送信元メールアドレスを設定すると、無料PDF案内メールのFromに反映されます。メール到達率を高めるには、WP Mail SMTP や FluentSMTP などのSMTP設定も併用してください。' ); ?></p>
 		<form method="post" action="">
 			<table class="form-table">
@@ -3272,8 +3535,7 @@ class DCJ_Free_PDF_Mailer {
 		);
 
 		?>
-		<h2><?php echo esc_html( '送信ログ' ); ?></h2>
-                <p><?php echo esc_html( '無料PDFフォームの送信履歴を確認できます。メール配信用の宛先は、購読者リストのメール配信用CSVから出力してください。' ); ?></p>
+		<p><?php echo esc_html( '無料PDFフォームの送信履歴を確認できます。メール配信用の宛先は、購読者リストのメール配信用CSVから出力してください。' ); ?></p>
 		<p>
 			<a class="button" href="<?php echo esc_url( $export_url ); ?>"><?php echo esc_html( '送信ログをCSV出力' ); ?></a>
 			<?php if ( 0 < $total_log_count ) : ?>
@@ -3906,7 +4168,6 @@ class DCJ_Free_PDF_Mailer {
 		);
 
 		?>
-		<h2 id="dcj-newsletter-broadcast"><?php echo esc_html( 'メルマガ送信' ); ?></h2>
 		<p><?php echo esc_html( '購読中のメールアドレスに、手動でメルマガを送信できます。まずテスト送信またはプレビューで内容を確認してから送信してください。' ); ?></p>
 		<?php if ( ! empty( $template_edit_id ) ) : ?>
 			<p style="font-weight: 600;"><?php echo esc_html( '現在、テンプレート「' . $template_name . '」を編集中です。' ); ?></p>
@@ -4191,7 +4452,6 @@ class DCJ_Free_PDF_Mailer {
 		);
 
 		?>
-		<h2><?php echo esc_html( '購読者リスト' ); ?></h2>
 		<p><?php echo esc_html( 'お知らせ受信に同意したメールアドレスを管理します。配信に使う場合は、購読中のメールアドレスだけを対象にしてください。' ); ?></p>
 		<?php if ( $missing_lang_count > 0 ) : ?>
 			<div class="notice notice-warning inline"><p><?php echo esc_html( '言語が未設定の購読者が ' . absint( $missing_lang_count ) . ' 件あります。必要に応じて ja または en を設定してください。' ); ?></p></div>
