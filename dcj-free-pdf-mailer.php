@@ -3,7 +3,7 @@
  * Plugin Name: DCJ Free PDF Mailer
  * Plugin URI: https://dreamcoloringjourney.com/
  * Description: Dream Coloring Journey の無料PDF配布フォーム用プラグインです。ショートコードIDごとに無料PDFメールを送信します。
- * Version: 1.7.0
+ * Version: 1.8.0
  * Author: 名富企画
  * Author URI: https://dreamcoloringjourney.com/
  * License: GPL2
@@ -33,7 +33,7 @@ class DCJ_Free_PDF_Mailer {
 	/**
 	 * プラグイン定数
 	 */
-	const VERSION                     = '1.7.0';
+	const VERSION                     = '1.8.0';
 	const PLUGIN_SLUG                 = 'dcj-free-pdf-mailer';
 	const CSS_PREFIX                  = 'dcj-fpm-';
 	const NONCE_ACTION                = 'dcj_free_pdf_submit';
@@ -1925,7 +1925,7 @@ class DCJ_Free_PDF_Mailer {
 			<?php $this->render_admin_section_end(); ?>
 
 			<?php $this->render_admin_section_start( 'download-report' ); ?>
-				<?php $this->render_download_report_placeholder(); ?>
+				<?php $this->render_download_report(); ?>
 			<?php $this->render_admin_section_end(); ?>
 
 			<?php $this->render_admin_collapsible_script(); ?>
@@ -2023,12 +2023,218 @@ class DCJ_Free_PDF_Mailer {
 	}
 
 	/**
-	 * ダウンロードレポートの準備中表示を出力します。
+	 * ダウンロードレポートを表示します。
 	 */
-	private function render_download_report_placeholder() {
+	private function render_download_report() {
+		$pdf_items      = $this->get_pdf_items();
+		$dlm_status     = $this->get_download_monitor_status();
+		$category_labels = $this->get_category_options();
 		?>
-		<p><?php echo esc_html( 'ダウンロードレポートは今後の拡張予定です。現時点では Download Monitor のレポート画面をご確認ください。' ); ?></p>
+		<p><?php echo esc_html( 'PDF設定ごとに、手動設定したDownload Monitor IDの簡易集計を表示します。Download Monitor側のデータは読み取り専用で参照します。' ); ?></p>
+		<?php if ( ! $dlm_status['is_ready'] ) : ?>
+			<div class="notice notice-warning inline"><p><?php echo esc_html( $dlm_status['message'] ); ?></p></div>
+		<?php endif; ?>
+		<table class="widefat striped">
+			<thead>
+				<tr>
+					<th><?php echo esc_html( 'PDF設定タイトル' ); ?></th>
+					<th><?php echo esc_html( 'ショートコードID' ); ?></th>
+					<th><?php echo esc_html( '言語' ); ?></th>
+					<th><?php echo esc_html( '配信カテゴリ' ); ?></th>
+					<th><?php echo esc_html( 'PDF URL' ); ?></th>
+					<th><?php echo esc_html( 'Download Monitor ID' ); ?></th>
+					<th><?php echo esc_html( '合計ダウンロード数' ); ?></th>
+					<th><?php echo esc_html( '最終ダウンロード日時' ); ?></th>
+					<th><?php echo esc_html( '備考' ); ?></th>
+				</tr>
+			</thead>
+			<tbody>
+				<?php if ( empty( $pdf_items ) ) : ?>
+					<tr>
+						<td colspan="9"><?php echo esc_html( 'PDF設定はまだありません。' ); ?></td>
+					</tr>
+				<?php else : ?>
+					<?php foreach ( $pdf_items as $pdf_id => $pdf_item ) : ?>
+						<?php
+						$report_row        = $this->get_download_report_row( $pdf_item, $dlm_status );
+						$lang              = ! empty( $pdf_item['lang'] ) ? $pdf_item['lang'] : '-';
+						$category          = ! empty( $pdf_item['category'] ) ? $pdf_item['category'] : '';
+						$category_label    = ! empty( $category ) && isset( $category_labels[ $category ] ) ? $category_labels[ $category ] : $category;
+						$tag_labels        = ! empty( $pdf_item['tags'] ) ? $this->get_newsletter_tag_labels( $pdf_item['tags'] ) : array();
+						$delivery_category = ! empty( $tag_labels ) ? implode( ' / ', $tag_labels ) : ( ! empty( $category_label ) ? $category_label : '-' );
+						$pdf_url           = ! empty( $pdf_item['pdf_url'] ) ? $pdf_item['pdf_url'] : '';
+						?>
+						<tr>
+							<td><?php echo esc_html( ! empty( $pdf_item['title'] ) ? $pdf_item['title'] : '-' ); ?></td>
+							<td><code><?php echo esc_html( $pdf_id ); ?></code></td>
+							<td><?php echo esc_html( $lang ); ?></td>
+							<td><?php echo esc_html( $delivery_category ); ?></td>
+							<td>
+								<?php if ( ! empty( $pdf_url ) ) : ?>
+									<a href="<?php echo esc_url( $pdf_url ); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html( $pdf_url ); ?></a>
+								<?php else : ?>
+									<?php echo esc_html( '-' ); ?>
+								<?php endif; ?>
+							</td>
+							<td><?php echo esc_html( $report_row['download_monitor_id'] ); ?></td>
+							<td><?php echo esc_html( $report_row['download_count'] ); ?></td>
+							<td><?php echo esc_html( $report_row['last_downloaded_at'] ); ?></td>
+							<td><?php echo esc_html( $report_row['note'] ); ?></td>
+						</tr>
+					<?php endforeach; ?>
+				<?php endif; ?>
+			</tbody>
+		</table>
 		<?php
+	}
+
+	/**
+	 * Download Monitorの利用状態を取得します。
+	 *
+	 * @return array
+	 */
+	private function get_download_monitor_status() {
+		global $wpdb;
+
+		$is_post_type_available = post_type_exists( 'dlm_download' );
+		$downloads_table        = $wpdb->prefix . 'dlm_downloads';
+		$log_table              = $wpdb->prefix . 'download_log';
+		$has_downloads_table    = $this->database_table_exists( $downloads_table );
+		$has_log_table          = $this->database_table_exists( $log_table );
+
+		if ( ! $is_post_type_available ) {
+			return array(
+				'is_ready'             => false,
+				'is_post_type_ready'   => false,
+				'has_downloads_table'  => $has_downloads_table,
+				'has_log_table'        => $has_log_table,
+				'downloads_table'      => $downloads_table,
+				'log_table'            => $log_table,
+				'message'              => 'Download Monitorが有効ではない、または必要なテーブルを確認できないため、ダウンロード数を取得できません。',
+				'row_note'             => 'Download Monitorが有効ではありません',
+			);
+		}
+
+		if ( ! $has_downloads_table || ! $has_log_table ) {
+			return array(
+				'is_ready'             => false,
+				'is_post_type_ready'   => true,
+				'has_downloads_table'  => $has_downloads_table,
+				'has_log_table'        => $has_log_table,
+				'downloads_table'      => $downloads_table,
+				'log_table'            => $log_table,
+				'message'              => 'Download Monitorが有効ではない、または必要なテーブルを確認できないため、ダウンロード数を取得できません。',
+				'row_note'             => 'Download Monitorテーブル未確認',
+			);
+		}
+
+		return array(
+			'is_ready'             => true,
+			'is_post_type_ready'   => true,
+			'has_downloads_table'  => true,
+			'has_log_table'        => true,
+			'downloads_table'      => $downloads_table,
+			'log_table'            => $log_table,
+			'message'              => '',
+			'row_note'             => '取得OK',
+		);
+	}
+
+	/**
+	 * DBテーブルの存在を確認します。
+	 *
+	 * @param string $table_name テーブル名
+	 * @return bool
+	 */
+	private function database_table_exists( $table_name ) {
+		global $wpdb;
+
+		$table_name = sanitize_text_field( $table_name );
+		if ( empty( $table_name ) ) {
+			return false;
+		}
+
+		$found_table = $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $table_name ) ) );
+		return $found_table === $table_name;
+	}
+
+	/**
+	 * PDF設定1件分のダウンロードレポート行を取得します。
+	 *
+	 * @param array $pdf_item PDF設定
+	 * @param array $dlm_status Download Monitor状態
+	 * @return array
+	 */
+	private function get_download_report_row( $pdf_item, $dlm_status ) {
+		global $wpdb;
+
+		$download_monitor_id = ! empty( $pdf_item['download_monitor_id'] ) ? absint( $pdf_item['download_monitor_id'] ) : 0;
+
+		if ( empty( $download_monitor_id ) ) {
+			return array(
+				'download_monitor_id' => '未設定',
+				'download_count'      => '-',
+				'last_downloaded_at'  => '-',
+				'note'                => 'Download Monitor ID未設定',
+			);
+		}
+
+		if ( empty( $dlm_status['is_post_type_ready'] ) ) {
+			return array(
+				'download_monitor_id' => (string) $download_monitor_id,
+				'download_count'      => '-',
+				'last_downloaded_at'  => '-',
+				'note'                => 'Download Monitorが有効ではありません',
+			);
+		}
+
+		$download_post = get_post( $download_monitor_id );
+		if ( empty( $download_post ) ) {
+			return array(
+				'download_monitor_id' => (string) $download_monitor_id,
+				'download_count'      => '-',
+				'last_downloaded_at'  => '-',
+				'note'                => 'ID未検出',
+			);
+		}
+
+		if ( 'dlm_download' !== $download_post->post_type ) {
+			return array(
+				'download_monitor_id' => (string) $download_monitor_id,
+				'download_count'      => '-',
+				'last_downloaded_at'  => '-',
+				'note'                => 'DLM投稿ではありません',
+			);
+		}
+
+		if ( empty( $dlm_status['is_ready'] ) ) {
+			return array(
+				'download_monitor_id' => (string) $download_monitor_id,
+				'download_count'      => '-',
+				'last_downloaded_at'  => '-',
+				'note'                => ! empty( $dlm_status['row_note'] ) ? $dlm_status['row_note'] : 'Download Monitorテーブル未確認',
+			);
+		}
+
+		$download_count = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT download_count FROM {$dlm_status['downloads_table']} WHERE download_id = %d LIMIT 1",
+				$download_monitor_id
+			)
+		);
+		$last_downloaded_at = $wpdb->get_var(
+			$wpdb->prepare(
+				"SELECT MAX(download_date) FROM {$dlm_status['log_table']} WHERE download_id = %d AND download_status IN ('completed', 'redirected')",
+				$download_monitor_id
+			)
+		);
+
+		return array(
+			'download_monitor_id' => (string) $download_monitor_id,
+			'download_count'      => null === $download_count ? '-' : (string) absint( $download_count ),
+			'last_downloaded_at'  => ! empty( $last_downloaded_at ) ? $last_downloaded_at : '-',
+			'note'                => null === $download_count ? '取得不可' : '取得OK',
+		);
 	}
 
 	/**
@@ -4805,11 +5011,12 @@ class DCJ_Free_PDF_Mailer {
 		// 利用条件・管理項目
 		$terms_type        = ! empty( $_POST['dcj_terms_type'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_terms_type'] ) ) : '';
 		$terms_text        = ! empty( $_POST['dcj_terms_text'] ) ? sanitize_textarea_field( wp_unslash( $_POST['dcj_terms_text'] ) ) : '';
-		$source_page_url   = ! empty( $_POST['dcj_source_page_url'] ) ? esc_url_raw( sanitize_url( wp_unslash( $_POST['dcj_source_page_url'] ) ) ) : '';
-		$kdp_asin          = ! empty( $_POST['dcj_kdp_asin'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_kdp_asin'] ) ) : '';
-		$kdp_title         = ! empty( $_POST['dcj_kdp_title'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_kdp_title'] ) ) : '';
-		$kdp_url           = ! empty( $_POST['dcj_kdp_url'] ) ? esc_url_raw( sanitize_url( wp_unslash( $_POST['dcj_kdp_url'] ) ) ) : '';
-		$admin_note        = ! empty( $_POST['dcj_admin_note'] ) ? sanitize_textarea_field( wp_unslash( $_POST['dcj_admin_note'] ) ) : '';
+		$source_page_url     = ! empty( $_POST['dcj_source_page_url'] ) ? esc_url_raw( sanitize_url( wp_unslash( $_POST['dcj_source_page_url'] ) ) ) : '';
+		$kdp_asin            = ! empty( $_POST['dcj_kdp_asin'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_kdp_asin'] ) ) : '';
+		$kdp_title           = ! empty( $_POST['dcj_kdp_title'] ) ? sanitize_text_field( wp_unslash( $_POST['dcj_kdp_title'] ) ) : '';
+		$kdp_url             = ! empty( $_POST['dcj_kdp_url'] ) ? esc_url_raw( sanitize_url( wp_unslash( $_POST['dcj_kdp_url'] ) ) ) : '';
+		$download_monitor_id = ! empty( $_POST['dcj_download_monitor_id'] ) ? absint( wp_unslash( $_POST['dcj_download_monitor_id'] ) ) : 0;
+		$admin_note          = ! empty( $_POST['dcj_admin_note'] ) ? sanitize_textarea_field( wp_unslash( $_POST['dcj_admin_note'] ) ) : '';
 
 		return array(
 			'id'                => $pdf_id,
@@ -4840,10 +5047,11 @@ class DCJ_Free_PDF_Mailer {
 			'terms_type'        => $terms_type,
 			'terms_text'        => $terms_text,
 			'source_page_url'   => $source_page_url,
-			'kdp_asin'          => $kdp_asin,
-			'kdp_title'         => $kdp_title,
-			'kdp_url'           => $kdp_url,
-			'admin_note'        => $admin_note,
+			'kdp_asin'            => $kdp_asin,
+			'kdp_title'           => $kdp_title,
+			'kdp_url'             => $kdp_url,
+			'download_monitor_id' => $download_monitor_id,
+			'admin_note'          => $admin_note,
 		);
 	}
 
@@ -4869,8 +5077,9 @@ class DCJ_Free_PDF_Mailer {
 			'title'             => 'サンプル塗り絵 無料PDF',
 			'description'       => 'メールアドレスを入力すると、無料PDFのご案内をお送りします。',
 			'thumbnail_url'     => '',
-			'pdf_url'           => '',
-			'mail_subject'      => '【Dream Coloring Journey】無料PDFダウンロードリンクのご案内',
+			'pdf_url'             => '',
+			'download_monitor_id' => 0,
+			'mail_subject'        => '【Dream Coloring Journey】無料PDFダウンロードリンクのご案内',
 			'mail_body'         => $default_mail_body,
 			'button_text'       => '送信する',
 			'label_text'        => 'メールアドレス',
@@ -4914,6 +5123,7 @@ class DCJ_Free_PDF_Mailer {
 						'description',
 						'thumbnail_url',
 						'pdf_url',
+						'download_monitor_id',
 						'mail_subject',
 						'mail_body',
 						'button_text',
@@ -5067,6 +5277,13 @@ class DCJ_Free_PDF_Mailer {
 						<input type="url" id="dcj_pdf_url" name="dcj_pdf_url" value="<?php echo esc_url( $add_values['pdf_url'] ); ?>" placeholder="<?php echo esc_attr( 'https://example.com/free-pdf.pdf' ); ?>" required />
 						<button type="button" class="button dcj-fpm-media-select-button" data-target="#dcj_pdf_url"><?php echo esc_html( 'メディアから選択' ); ?></button>
 						<p class="description"><?php echo esc_html( '受信メール本文の {{pdf_url}} に入ります。必ずブラウザで直接開けるPDF URLを指定してください。/wp-content/uploads/dlm_uploads/ 配下など、直接アクセス禁止のURLは使用しないでください。' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_download_monitor_id"><?php echo esc_html( 'Download Monitor ID' ); ?></label></th>
+					<td>
+						<input type="number" id="dcj_download_monitor_id" name="dcj_download_monitor_id" value="<?php echo esc_attr( ! empty( $add_values['download_monitor_id'] ) ? absint( $add_values['download_monitor_id'] ) : '' ); ?>" min="0" step="1" />
+						<p class="description"><?php echo esc_html( 'Download Monitor のダウンロード投稿IDを入力すると、ダウンロードレポートに件数を表示できます。未設定でもPDF配布には影響ありません。' ); ?></p>
 					</td>
 				</tr>
 				<tr>
@@ -5364,6 +5581,13 @@ class DCJ_Free_PDF_Mailer {
 						<input type="url" id="dcj_edit_pdf_url" name="dcj_pdf_url" value="<?php echo esc_url( ! empty( $pdf_item['pdf_url'] ) ? $pdf_item['pdf_url'] : '' ); ?>" required />
 						<button type="button" class="button dcj-fpm-media-select-button" data-target="#dcj_edit_pdf_url"><?php echo esc_html( 'メディアから選択' ); ?></button>
 						<p class="description"><?php echo esc_html( '受信メール本文の {{pdf_url}} に入ります。必ずブラウザで直接開けるPDF URLを指定してください。/wp-content/uploads/dlm_uploads/ 配下など、直接アクセス禁止のURLは使用しないでください。' ); ?></p>
+					</td>
+				</tr>
+				<tr>
+					<th scope="row"><label for="dcj_edit_download_monitor_id"><?php echo esc_html( 'Download Monitor ID' ); ?></label></th>
+					<td>
+						<input type="number" id="dcj_edit_download_monitor_id" name="dcj_download_monitor_id" value="<?php echo esc_attr( ! empty( $pdf_item['download_monitor_id'] ) ? absint( $pdf_item['download_monitor_id'] ) : '' ); ?>" min="0" step="1" />
+						<p class="description"><?php echo esc_html( 'Download Monitor のダウンロード投稿IDを入力すると、ダウンロードレポートに件数を表示できます。未設定でもPDF配布には影響ありません。' ); ?></p>
 					</td>
 				</tr>
 				<tr>
