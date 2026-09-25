@@ -3,7 +3,7 @@
  * Plugin Name: DCJ Free PDF Mailer
  * Plugin URI: https://dreamcoloringjourney.com/
  * Description: Dream Coloring Journey の無料PDF配布フォーム用プラグインです。ショートコードIDごとに無料PDFメールを送信します。
- * Version: 1.8.0
+ * Version: 1.8.1
  * Author: 名富企画
  * Author URI: https://dreamcoloringjourney.com/
  * License: GPL2
@@ -33,7 +33,7 @@ class DCJ_Free_PDF_Mailer {
 	/**
 	 * プラグイン定数
 	 */
-	const VERSION                     = '1.8.0';
+	const VERSION                     = '1.8.1';
 	const PLUGIN_SLUG                 = 'dcj-free-pdf-mailer';
 	const CSS_PREFIX                  = 'dcj-fpm-';
 	const NONCE_ACTION                = 'dcj_free_pdf_submit';
@@ -74,6 +74,9 @@ class DCJ_Free_PDF_Mailer {
 
 		// CSSと点滅アニメーションを出力
 		add_action( 'wp_head', array( $this, 'output_styles' ) );
+
+		// 管理者限定REST API
+		add_action( 'rest_api_init', array( $this, 'register_rest_routes' ) );
 
 		// 管理画面メニュー登録
 		add_action( 'admin_menu', array( $this, 'register_admin_menu' ) );
@@ -274,6 +277,272 @@ class DCJ_Free_PDF_Mailer {
 		}
 
 		return null;
+	}
+
+	/**
+	 * 次に使用できる管理ID候補を取得します。
+	 *
+	 * @param string $lang 言語
+	 * @return string
+	 */
+	private function get_suggested_pdf_id( $lang ) {
+		$lang       = in_array( $lang, array( 'ja', 'en' ), true ) ? $lang : 'ja';
+		$max_number = 0;
+
+		foreach ( array_keys( $this->get_pdf_items() ) as $pdf_id ) {
+			if ( preg_match( '/^dcj-(\d+)(?:-(?:ja|en))?$/', (string) $pdf_id, $matches ) ) {
+				$max_number = max( $max_number, absint( $matches[1] ) );
+			}
+		}
+
+		return sprintf( 'dcj-%03d-%s', $max_number + 1, $lang );
+	}
+
+	/**
+	 * 管理者限定REST APIを登録します。
+	 */
+	public function register_rest_routes() {
+		register_rest_route(
+			'dcj-fpm/v1',
+			'/pdf-items',
+			array(
+				array(
+					'methods'             => WP_REST_Server::READABLE,
+					'callback'            => array( $this, 'rest_get_pdf_items' ),
+					'permission_callback' => array( $this, 'rest_can_manage_pdf_items' ),
+				),
+				array(
+					'methods'             => WP_REST_Server::CREATABLE,
+					'callback'            => array( $this, 'rest_create_pdf_item' ),
+					'permission_callback' => array( $this, 'rest_can_manage_pdf_items' ),
+				),
+			)
+		);
+	}
+
+	/**
+	 * PDF設定APIの権限を確認します。
+	 *
+	 * @return bool
+	 */
+	public function rest_can_manage_pdf_items() {
+		return current_user_can( 'manage_options' );
+	}
+
+	/**
+	 * PDF設定一覧を返します。
+	 *
+	 * @return WP_REST_Response
+	 */
+	public function rest_get_pdf_items() {
+		$items = $this->get_pdf_items();
+
+		return rest_ensure_response(
+			array(
+				'count'    => count( $items ),
+				'next_ids' => array(
+					'ja' => $this->get_suggested_pdf_id( 'ja' ),
+					'en' => $this->get_suggested_pdf_id( 'en' ),
+				),
+				'items'    => $items,
+			)
+		);
+	}
+
+	/**
+	 * REST登録用の言語別既定値を取得します。
+	 *
+	 * @param string $lang 言語
+	 * @return array
+	 */
+	private function get_rest_pdf_defaults( $lang ) {
+		if ( 'en' === $lang ) {
+			return array(
+				'mail_subject'      => 'Your Free PDF Download Link from Dream Coloring Journey',
+				'mail_body'         => "Hello,\n\nThank you for requesting {{title}}.\n\nYou can download your PDF from the link below:\n\n{{pdf_url}}\n\nTerms of use:\n{{terms_text}}\n\n{{newsletter_unsubscribe_block}}\n\nWe hope you enjoy your coloring time.\n\nDream Coloring Journey",
+				'button_text'       => 'Send',
+				'label_text'        => 'Email address',
+				'note_text'         => 'Your email address will be used to send this free PDF.',
+				'success_message'   => 'Your free PDF email has been sent. Please check your inbox.',
+				'duplicate_message' => 'You have already requested this PDF. Please check your inbox.',
+				'disabled_message'  => 'This free PDF is currently unavailable.',
+				'terms_text'        => 'For personal and family use only. Redistribution, resale, and commercial use are not allowed.',
+			);
+		}
+
+		return array(
+			'mail_subject'      => '【Dream Coloring Journey】無料PDFダウンロードリンクのご案内',
+			'mail_body'         => "こんにちは。\n\n{{title}} にお申し込みいただき、ありがとうございます。\n\n以下のリンクからPDFをダウンロードできます。\n\n{{pdf_url}}\n\n利用条件：\n{{terms_text}}\n\n{{newsletter_unsubscribe_block}}\n\n塗り絵の時間を楽しんでいただければ嬉しいです。\n\nDream Coloring Journey",
+			'button_text'       => '送信する',
+			'label_text'        => 'メールアドレス',
+			'note_text'         => 'ご入力いただいたメールアドレスは、無料PDFのご案内に使用します。',
+			'success_message'   => '無料PDFのご案内メールを送信しました。メールボックスをご確認ください。',
+			'duplicate_message' => 'すでにお申し込み済みです。メールボックスをご確認ください。',
+			'disabled_message'  => 'この無料PDFは現在配布を停止しています。',
+			'terms_text'        => '家庭内での個人利用に限ります。再配布・二次配布・商用利用は禁止です。',
+		);
+	}
+
+	/**
+	 * REST経由のPDF URLを検証します。
+	 *
+	 * @param string $url PDF URL
+	 * @return string|WP_Error
+	 */
+	private function validate_rest_pdf_url( $url ) {
+		$url = esc_url_raw( sanitize_url( (string) $url ) );
+		if ( empty( $url ) ) {
+			return new WP_Error( 'dcj_fpm_pdf_url_required', 'PDF URL is required.', array( 'status' => 400 ) );
+		}
+
+		$scheme    = strtolower( (string) wp_parse_url( $url, PHP_URL_SCHEME ) );
+		$pdf_host  = strtolower( preg_replace( '/^www\./', '', (string) wp_parse_url( $url, PHP_URL_HOST ) ) );
+		$site_host = strtolower( preg_replace( '/^www\./', '', (string) wp_parse_url( home_url(), PHP_URL_HOST ) ) );
+
+		if ( 'https' !== $scheme || empty( $pdf_host ) || $pdf_host !== $site_host ) {
+			return new WP_Error(
+				'dcj_fpm_pdf_url_not_allowed',
+				'PDF URL must use HTTPS and the same host as this WordPress site.',
+				array( 'status' => 400 )
+			);
+		}
+
+		return $url;
+	}
+
+	/**
+	 * REST payloadをPDF設定へ変換します。
+	 *
+	 * @param string $pdf_id PDF識別ID
+	 * @param array  $payload 入力
+	 * @return array|WP_Error
+	 */
+	private function sanitize_rest_pdf_item( $pdf_id, $payload ) {
+		$lang = ! empty( $payload['lang'] ) ? sanitize_key( $payload['lang'] ) : 'ja';
+		if ( ! in_array( $lang, array( 'ja', 'en' ), true ) ) {
+			return new WP_Error( 'dcj_fpm_invalid_lang', 'lang must be ja or en.', array( 'status' => 400 ) );
+		}
+
+		$title = ! empty( $payload['title'] ) ? sanitize_text_field( $payload['title'] ) : '';
+		if ( '' === $title ) {
+			return new WP_Error( 'dcj_fpm_title_required', 'title is required.', array( 'status' => 400 ) );
+		}
+
+		$pdf_url = $this->validate_rest_pdf_url( isset( $payload['pdf_url'] ) ? $payload['pdf_url'] : '' );
+		if ( is_wp_error( $pdf_url ) ) {
+			return $pdf_url;
+		}
+
+		$unsupported_tags = $this->get_unsupported_newsletter_tags( isset( $payload['tags'] ) ? $payload['tags'] : array() );
+		if ( ! empty( $unsupported_tags ) ) {
+			return new WP_Error(
+				'dcj_fpm_invalid_tags',
+				'Unsupported newsletter tags: ' . implode( ', ', $unsupported_tags ),
+				array( 'status' => 400 )
+			);
+		}
+
+		$defaults = $this->get_rest_pdf_defaults( $lang );
+		$category = ! empty( $payload['category'] ) ? sanitize_key( $payload['category'] ) : 'book_image';
+		if ( ! isset( $this->get_category_options()[ $category ] ) ) {
+			$category = 'other';
+		}
+
+		$enabled = isset( $payload['enabled'] ) ? rest_sanitize_boolean( $payload['enabled'] ) : false;
+
+		return array(
+			'id'                  => $pdf_id,
+			'lang'                => $lang,
+			'enabled'             => $enabled,
+			'type'                => ! empty( $payload['type'] ) ? sanitize_key( $payload['type'] ) : 'set',
+			'category'            => $category,
+			'tags'                => $this->sanitize_newsletter_tags( isset( $payload['tags'] ) ? $payload['tags'] : array() ),
+			'audience'            => ! empty( $payload['audience'] ) ? sanitize_key( $payload['audience'] ) : 'adult',
+			'audience_label'      => ! empty( $payload['audience_label'] ) ? sanitize_text_field( $payload['audience_label'] ) : '',
+			'volume_label'        => ! empty( $payload['volume_label'] ) ? sanitize_text_field( $payload['volume_label'] ) : '',
+			'sort_order'          => ! empty( $payload['sort_order'] ) ? absint( $payload['sort_order'] ) : 0,
+			'placement_type'      => ! empty( $payload['placement_type'] ) ? sanitize_key( $payload['placement_type'] ) : 'official_freebie_page',
+			'delivery_method'     => 'email',
+			'migration_status'    => ! empty( $payload['migration_status'] ) ? sanitize_key( $payload['migration_status'] ) : 'converted',
+			'title'               => $title,
+			'description'         => ! empty( $payload['description'] ) ? sanitize_textarea_field( $payload['description'] ) : '',
+			'thumbnail_url'       => ! empty( $payload['thumbnail_url'] ) ? esc_url_raw( sanitize_url( $payload['thumbnail_url'] ) ) : '',
+			'pdf_url'             => $pdf_url,
+			'mail_subject'        => ! empty( $payload['mail_subject'] ) ? sanitize_text_field( $payload['mail_subject'] ) : $defaults['mail_subject'],
+			'mail_body'           => ! empty( $payload['mail_body'] ) ? sanitize_textarea_field( $payload['mail_body'] ) : $defaults['mail_body'],
+			'button_text'         => ! empty( $payload['button_text'] ) ? sanitize_text_field( $payload['button_text'] ) : $defaults['button_text'],
+			'label_text'          => ! empty( $payload['label_text'] ) ? sanitize_text_field( $payload['label_text'] ) : $defaults['label_text'],
+			'note_text'           => ! empty( $payload['note_text'] ) ? sanitize_textarea_field( $payload['note_text'] ) : $defaults['note_text'],
+			'success_message'     => ! empty( $payload['success_message'] ) ? sanitize_text_field( $payload['success_message'] ) : $defaults['success_message'],
+			'duplicate_message'   => ! empty( $payload['duplicate_message'] ) ? sanitize_text_field( $payload['duplicate_message'] ) : $defaults['duplicate_message'],
+			'disabled_message'    => ! empty( $payload['disabled_message'] ) ? sanitize_text_field( $payload['disabled_message'] ) : $defaults['disabled_message'],
+			'terms_type'          => ! empty( $payload['terms_type'] ) ? sanitize_key( $payload['terms_type'] ) : 'personal_use_only',
+			'terms_text'          => ! empty( $payload['terms_text'] ) ? sanitize_textarea_field( $payload['terms_text'] ) : $defaults['terms_text'],
+			'source_page_url'     => ! empty( $payload['source_page_url'] ) ? esc_url_raw( sanitize_url( $payload['source_page_url'] ) ) : '',
+			'kdp_asin'            => ! empty( $payload['kdp_asin'] ) ? sanitize_text_field( $payload['kdp_asin'] ) : '',
+			'kdp_title'           => ! empty( $payload['kdp_title'] ) ? sanitize_text_field( $payload['kdp_title'] ) : '',
+			'kdp_url'             => ! empty( $payload['kdp_url'] ) ? esc_url_raw( sanitize_url( $payload['kdp_url'] ) ) : '',
+			'download_monitor_id' => ! empty( $payload['download_monitor_id'] ) ? absint( $payload['download_monitor_id'] ) : 0,
+			'admin_note'          => ! empty( $payload['admin_note'] ) ? sanitize_textarea_field( $payload['admin_note'] ) : '',
+		);
+	}
+
+	/**
+	 * REST APIからPDF設定を新規作成します。
+	 *
+	 * 既存IDの上書きや削除は行いません。
+	 *
+	 * @param WP_REST_Request $request REST request
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public function rest_create_pdf_item( $request ) {
+		$payload = $request->get_json_params();
+		if ( ! is_array( $payload ) ) {
+			$payload = $request->get_params();
+		}
+
+		$lang = ! empty( $payload['lang'] ) ? sanitize_key( $payload['lang'] ) : 'ja';
+		if ( ! in_array( $lang, array( 'ja', 'en' ), true ) ) {
+			return new WP_Error( 'dcj_fpm_invalid_lang', 'lang must be ja or en.', array( 'status' => 400 ) );
+		}
+
+		$pdf_id = ! empty( $payload['id'] ) ? sanitize_key( $payload['id'] ) : $this->get_suggested_pdf_id( $lang );
+		if ( ! preg_match( '/^dcj-\d{3,}-(ja|en)$/', $pdf_id, $matches ) || $matches[1] !== $lang ) {
+			return new WP_Error(
+				'dcj_fpm_invalid_pdf_id',
+				'id must use the format dcj-001-ja or dcj-002-en and match lang.',
+				array( 'status' => 400 )
+			);
+		}
+
+		$items = $this->get_pdf_items();
+		if ( isset( $items[ $pdf_id ] ) ) {
+			return new WP_Error(
+				'dcj_fpm_pdf_id_exists',
+				'PDF setting already exists. Existing settings are never overwritten by this API.',
+				array( 'status' => 409 )
+			);
+		}
+
+		$pdf_item = $this->sanitize_rest_pdf_item( $pdf_id, $payload );
+		if ( is_wp_error( $pdf_item ) ) {
+			return $pdf_item;
+		}
+
+		$items[ $pdf_id ] = $pdf_item;
+		if ( ! update_option( self::OPTION_PDF_ITEMS, $items ) ) {
+			return new WP_Error( 'dcj_fpm_pdf_save_failed', 'Failed to save PDF setting.', array( 'status' => 500 ) );
+		}
+
+		return new WP_REST_Response(
+			array(
+				'created'   => true,
+				'id'        => $pdf_id,
+				'shortcode' => sprintf( '[dcj_free_pdf id="%s"]', $pdf_id ),
+				'item'      => $pdf_item,
+			),
+			201
+		);
 	}
 
 	private function get_category_options() {
