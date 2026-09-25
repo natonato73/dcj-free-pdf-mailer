@@ -119,30 +119,30 @@ php -l includes/index.php
 
 ## 7. zip作成
 
-- [ ] zipを作成した
+- [ ] `scripts/build_release_zip.py` でzipを作成した
+- [ ] ビルド処理が必須ファイル欠落なしで完了した
 - [ ] zip内に `dcj-free-pdf-mailer.php` がある
-- [ ] zip内に `includes/` フォルダがある
+- [ ] zip内に `includes/` フォルダと必須6ファイルがある
 - [ ] zip内に `docs/` フォルダがある
 - [ ] zip内に `README.md` がある
 - [ ] zip内に `README-ja.md` がある
 - [ ] zip内に `.git` がない
 - [ ] zip内に `.codex` がない
 - [ ] zip内に不要な一時ファイルや秘密情報がない
+- [ ] SHA-256を記録した
+- [ ] `unzip -l` で最終内容を目視確認した
 
-zip作成例:
+標準ビルド:
 
 ```bash
-cd ~/code
-rm -f dcj-free-pdf-mailer.zip
-
-zip -r dcj-free-pdf-mailer.zip dcj-free-pdf-mailer \
-  -x "dcj-free-pdf-mailer/.git/*" \
-  -x "dcj-free-pdf-mailer/.git" \
-  -x "dcj-free-pdf-mailer/.codex/*" \
-  -x "dcj-free-pdf-mailer/.codex"
-
-unzip -l ~/code/dcj-free-pdf-mailer.zip
+cd ~/code/dcj-free-pdf-mailer
+python3 scripts/build_release_zip.py
+unzip -l output/dcj-free-pdf-mailer-vX.Y.Z.zip
+sha256sum output/dcj-free-pdf-mailer-vX.Y.Z.zip
 ```
+
+`dcj-free-pdf-mailer.php` だけを手作業でzip化しないでください。
+`includes/` が欠けたzipで既存プラグインを置き換えると、読み込み時にPHP Fatal errorになります。
 
 ## 8. 本番更新前確認
 
