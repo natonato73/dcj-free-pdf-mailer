@@ -3,7 +3,7 @@
  * Plugin Name: DCJ Free PDF Mailer
  * Plugin URI: https://dreamcoloringjourney.com/
  * Description: Dream Coloring Journey の無料PDF配布フォーム用プラグインです。ショートコードIDごとに無料PDFメールを送信します。
- * Version: 1.8.1
+ * Version: 1.8.2
  * Author: 名富企画
  * Author URI: https://dreamcoloringjourney.com/
  * License: GPL2
@@ -33,12 +33,13 @@ class DCJ_Free_PDF_Mailer {
 	/**
 	 * プラグイン定数
 	 */
-	const VERSION                     = '1.8.1';
+	const VERSION                     = '1.8.2';
 	const PLUGIN_SLUG                 = 'dcj-free-pdf-mailer';
 	const CSS_PREFIX                  = 'dcj-fpm-';
 	const NONCE_ACTION                = 'dcj_free_pdf_submit';
 	const NONCE_NAME                  = 'dcj_free_pdf_nonce';
 	const DUPLICATE_CHECK_EXPIRE      = 300; // 5分（秒）
+	const SUBMISSION_LOCK_EXPIRE       = 120; // 送信中ロックの最大保持時間（秒）
 	const OPTION_PDF_ITEMS            = 'dcj_fpm_pdf_items';
 	const OPTION_SUBMISSION_LOGS      = 'dcj_fpm_submission_logs';
 	const OPTION_SUBSCRIBERS          = 'dcj_fpm_subscribers';
@@ -843,6 +844,13 @@ class DCJ_Free_PDF_Mailer {
 			return;
 		}
 
+		// ほぼ同時に到着した別リクエストを、メール送信前に原子的にブロックします。
+		if ( ! $this->acquire_submission_lock( $duplicate_key ) ) {
+			$duplicate_message = ! empty( $pdf_item['duplicate_message'] ) ? $pdf_item['duplicate_message'] : 'すでにお申し込み済みです。メールボックスをご確認ください。';
+			self::$messages[ $pdf_id ] = $this->get_error_message( $duplicate_message );
+			return;
+		}
+
 		// 件名
 		$subject = ! empty( $pdf_item['mail_subject'] ) ? $pdf_item['mail_subject'] : '無料PDFダウンロードリンクのご案内';
 
@@ -897,21 +905,75 @@ class DCJ_Free_PDF_Mailer {
 			$headers[] = 'From: ' . $mail_settings['from_name'] . ' <' . $mail_settings['from_email'] . '>';
 		}
 
-		$sent = wp_mail( $email, $subject, $body, $headers );
-		$this->save_submission_log( $email, $pdf_id, ! empty( $pdf_item['lang'] ) ? $pdf_item['lang'] : '', $sent ? 'success' : 'failed', $newsletter_optin );
-		if ( 'yes' === $newsletter_optin ) {
-			$this->save_subscriber( $email, $pdf_id, $pdf_item );
+		$sent = false;
+
+		try {
+			$sent = wp_mail( $email, $subject, $body, $headers );
+			$this->save_submission_log( $email, $pdf_id, ! empty( $pdf_item['lang'] ) ? $pdf_item['lang'] : '', $sent ? 'success' : 'failed', $newsletter_optin );
+			if ( 'yes' === $newsletter_optin ) {
+				$this->save_subscriber( $email, $pdf_id, $pdf_item );
+			}
+
+			if ( $sent ) {
+				// 送信中ロックを解放する前に、5分間の重複送信防止フラグを保存します。
+				set_transient( 'dcj_fpm_sent_' . $duplicate_key, 1, self::DUPLICATE_CHECK_EXPIRE );
+			}
+		} finally {
+			$this->release_submission_lock( $duplicate_key );
 		}
 
 		if ( $sent ) {
-			// 送信成功後、重複送信防止フラグを5分間保存
-			set_transient( 'dcj_fpm_sent_' . $duplicate_key, 1, self::DUPLICATE_CHECK_EXPIRE );
-
 			$success_message = ! empty( $pdf_item['success_message'] ) ? $pdf_item['success_message'] : '無料PDFのご案内メールを送信しました。';
 			self::$messages[ $pdf_id ] = $this->get_success_message( $success_message );
 		} else {
 			self::$messages[ $pdf_id ] = $this->get_error_message( 'メール送信に失敗しました。Localのメール設定を確認してください。' );
 		}
+	}
+
+	/**
+	 * 同一PDF・メールアドレスの送信中ロック名を返します。
+	 *
+	 * @param string $duplicate_key 重複判定キー
+	 * @return string
+	 */
+	private function get_submission_lock_option_name( $duplicate_key ) {
+		return 'dcj_fpm_sending_' . sanitize_key( $duplicate_key );
+	}
+
+	/**
+	 * 送信中ロックを原子的に取得します。
+	 *
+	 * wp_options.option_name の一意制約を利用するため、同時リクエストでも
+	 * add_option() に成功するのは原則として1リクエストだけです。
+	 *
+	 * @param string $duplicate_key 重複判定キー
+	 * @return bool
+	 */
+	private function acquire_submission_lock( $duplicate_key ) {
+		$option_name = $this->get_submission_lock_option_name( $duplicate_key );
+		$now         = time();
+
+		if ( add_option( $option_name, $now, '', false ) ) {
+			return true;
+		}
+
+		$locked_at = absint( get_option( $option_name, 0 ) );
+		if ( 0 < $locked_at && self::SUBMISSION_LOCK_EXPIRE < ( $now - $locked_at ) ) {
+			delete_option( $option_name );
+			return add_option( $option_name, $now, '', false );
+		}
+
+		return false;
+	}
+
+	/**
+	 * 送信中ロックを解放します。
+	 *
+	 * @param string $duplicate_key 重複判定キー
+	 * @return void
+	 */
+	private function release_submission_lock( $duplicate_key ) {
+		delete_option( $this->get_submission_lock_option_name( $duplicate_key ) );
 	}
 
 	/**
@@ -1591,14 +1653,19 @@ class DCJ_Free_PDF_Mailer {
 			$html .= 'var tokenInput=document.getElementById(' . wp_json_encode( $recaptcha_input_id ) . ');';
 			$html .= 'if(!form||!tokenInput){return;}';
 			$html .= 'form.addEventListener("submit",function(event){';
-			$html .= 'if(form.getAttribute("data-dcj-recaptcha-submitting")==="1"){return;}';
+			$html .= 'if(form.getAttribute("data-dcj-recaptcha-submitting")==="1"){event.preventDefault();return;}';
 			$html .= 'event.preventDefault();';
+			$html .= 'form.setAttribute("data-dcj-recaptcha-submitting","1");';
+			$html .= 'var submitButton=form.querySelector("button[type=submit]");';
+			$html .= 'if(submitButton){submitButton.disabled=true;}';
 			$html .= 'if(typeof grecaptcha==="undefined"){form.submit();return;}';
 			$html .= 'grecaptcha.ready(function(){';
 			$html .= 'grecaptcha.execute(' . wp_json_encode( $mail_settings['recaptcha_site_key'] ) . ',{action:"dcj_free_pdf_submit"}).then(function(token){';
 			$html .= 'tokenInput.value=token;';
-			$html .= 'form.setAttribute("data-dcj-recaptcha-submitting","1");';
 			$html .= 'form.submit();';
+			$html .= '}).catch(function(){';
+			$html .= 'form.removeAttribute("data-dcj-recaptcha-submitting");';
+			$html .= 'if(submitButton){submitButton.disabled=false;}';
 			$html .= '});';
 			$html .= '});';
 			$html .= '});';
